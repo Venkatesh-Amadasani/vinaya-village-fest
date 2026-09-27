@@ -23,7 +23,7 @@ async function ctx(year?: number) {
   const viewer = resolveViewer(user, db.userPermissions, db.memberships, festival.id);
   return { db, festival, viewer };
 }
-function require(v: Viewer, p: Permission) {
+function requirePerm(v: Viewer, p: Permission) {
   if (!can(v, p)) throw new Error("PERMISSION_DENIED");
 }
 const yearInput = z.object({ year: z.number().int().optional() });
@@ -159,7 +159,7 @@ export const addDonationFn = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data }) => {
     const { db, festival, viewer } = await ctx();
-    require(viewer, "DONATION_ADD");
+    requirePerm(viewer, "DONATION_ADD");
     if (data.scope !== "GENERAL" && !viewer.canSeeYouth) throw new Error("PERMISSION_DENIED");
     if (!acceptsFinancialWrites(festival.status)) throw new Error("Festival is not accepting changes");
     const err = validateDonationSplit(data);
@@ -185,7 +185,7 @@ export const addExpenseFn = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data }) => {
     const { db, festival, viewer } = await ctx();
-    require(viewer, "EXPENSE_ADD");
+    requirePerm(viewer, "EXPENSE_ADD");
     if (data.scope === "YOUTH" && !viewer.canSeeYouth) throw new Error("PERMISSION_DENIED");
     if (!acceptsFinancialWrites(festival.status)) throw new Error("Festival is not accepting changes");
     const { newId, writeAudit } = await store();
@@ -199,7 +199,7 @@ export const addContributionFn = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ auctionId: z.string(), contributorName: z.string().trim().min(1).max(120), amount: z.number().positive(), method }).parse(d))
   .handler(async ({ data }) => {
     const { db, festival, viewer } = await ctx();
-    require(viewer, "CONTRIBUTION_ADD");
+    requirePerm(viewer, "CONTRIBUTION_ADD");
     const a = db.auctions.find((x) => x.id === data.auctionId && !x.deletedAt);
     if (!a) throw new Error("Auction not found");
     if (a.scope === "YOUTH" && !viewer.canSeeYouth) throw new Error("PERMISSION_DENIED");
@@ -217,7 +217,7 @@ export const softDeleteFn = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ entity: z.enum(["donation", "expense"]), id: z.string(), reason: z.string().trim().min(3).max(300) }).parse(d))
   .handler(async ({ data }) => {
     const { db, viewer } = await ctx();
-    require(viewer, data.entity === "donation" ? "DONATION_DELETE" : "EXPENSE_DELETE");
+    requirePerm(viewer, data.entity === "donation" ? "DONATION_DELETE" : "EXPENSE_DELETE");
     const list: Array<Donation | Expense> = data.entity === "donation" ? db.donations : db.expenses;
     const rec = list.find((r) => r.id === data.id && !r.deletedAt);
     if (!rec) throw new Error("Record not found");
