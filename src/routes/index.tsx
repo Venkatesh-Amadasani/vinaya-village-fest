@@ -1,24 +1,29 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { overviewQ, donationsQ, auctionsQ, galleryQ, festivalsQ, expensesQ } from "@/lib/queries";
+import { FestivalHome } from "@/components/app/FestivalHome";
+import { ErrorState, PageSkeleton } from "@/components/app/bits";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "Vinayaka Chavithi 2026 — Village Festival & Accounts" },
+      { name: "description", content: "Our village Vinayaka Chavithi festival: open donations, expenses, auction results, highlights and memories in English and Telugu." },
+      { property: "og:title", content: "Vinayaka Chavithi 2026 — Village Festival & Accounts" },
+      { property: "og:description", content: "Every rupee accounted. Donations, expenses, auctions and gallery for our village festival." },
+    ],
+  }),
+  loader: async ({ context: { queryClient: qc } }) => {
+    await Promise.all([
+      qc.ensureQueryData(overviewQ()), qc.ensureQueryData(donationsQ({})), qc.ensureQueryData(expensesQ({})),
+      qc.ensureQueryData(auctionsQ()), qc.ensureQueryData(galleryQ()), qc.ensureQueryData(festivalsQ()),
+    ]);
+  },
+  pendingComponent: PageSkeleton,
+  errorComponent: ({ error, reset }) => <ErrorState error={error} onRetry={reset} />,
+  notFoundComponent: () => <Link to="/">Home</Link>,
+  component: () => {
+    const { data } = useSuspenseQuery(overviewQ());
+    return <FestivalHome year={undefined} overview={data} />;
+  },
 });
-
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
