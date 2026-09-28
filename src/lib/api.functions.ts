@@ -104,7 +104,7 @@ export const listDonationsFn = createServerFn({ method: "GET" })
     if (data.scope === "YOUTH") rows = rows.filter((d) => d.youthAmount > 0);
     if (q) rows = rows.filter((d) => d.donorName.toLowerCase().includes(q) || (d.village ?? "").toLowerCase().includes(q));
     rows.sort((a, b) => b.date.localeCompare(a.date));
-    return { ...paginate(rows, data.page), sum: rows.reduce((s, d) => s + d.totalAmount, 0), canSeeYouth: viewer.canSeeYouth, canAdd: can(viewer, "DONATION_ADD"), canDelete: can(viewer, "DONATION_DELETE") };
+    return { ...paginate(rows, data.page), sum: rows.reduce((s, d) => s + d.totalAmount, 0), canSeeYouth: viewer.canSeeYouth, readOnly: !acceptsFinancialWrites(festival.status), canAdd: can(viewer, "DONATION_ADD") && acceptsFinancialWrites(festival.status), canDelete: can(viewer, "DONATION_DELETE") && acceptsFinancialWrites(festival.status) };
   });
 
 export const listExpensesFn = createServerFn({ method: "GET" })
@@ -117,7 +117,7 @@ export const listExpensesFn = createServerFn({ method: "GET" })
     if (data.scope && data.scope !== "ALL") rows = rows.filter((e) => e.scope === data.scope);
     if (q) rows = rows.filter((e) => e.description.toLowerCase().includes(q) || (e.paidTo ?? "").toLowerCase().includes(q));
     rows.sort((a, b) => b.date.localeCompare(a.date));
-    return { ...paginate(rows, data.page), sum: rows.reduce((s, e) => s + e.amount, 0), categories: db.categories, canSeeYouth: viewer.canSeeYouth, canAdd: can(viewer, "EXPENSE_ADD"), canDelete: can(viewer, "EXPENSE_DELETE") };
+    return { ...paginate(rows, data.page), sum: rows.reduce((s, e) => s + e.amount, 0), categories: db.categories, canSeeYouth: viewer.canSeeYouth, readOnly: !acceptsFinancialWrites(festival.status), canAdd: can(viewer, "EXPENSE_ADD") && acceptsFinancialWrites(festival.status), canDelete: can(viewer, "EXPENSE_DELETE") && acceptsFinancialWrites(festival.status) };
   });
 
 export const listAuctionsFn = createServerFn({ method: "GET" })
@@ -126,7 +126,8 @@ export const listAuctionsFn = createServerFn({ method: "GET" })
     const { db, festival, viewer } = await ctx(data.year);
     const auctions = live(db.auctions.filter((a) => a.festivalId === festival.id));
     return {
-      canAddContribution: can(viewer, "CONTRIBUTION_ADD"),
+      readOnly: !acceptsFinancialWrites(festival.status),
+      canAddContribution: can(viewer, "CONTRIBUTION_ADD") && acceptsFinancialWrites(festival.status),
       auctions: auctions.map((a) => {
         const hideContributors = !viewer.canSeeYouth && (a.scope === "YOUTH" || a.winnerType === "GROUP");
         const cs = live(db.contributions.filter((c) => c.auctionId === a.id));
@@ -203,6 +204,8 @@ export const addContributionFn = createServerFn({ method: "POST" })
     const a = db.auctions.find((x) => x.id === data.auctionId && !x.deletedAt);
     if (!a) throw new Error("Auction not found");
     if (a.scope === "YOUTH" && !viewer.canSeeYouth) throw new Error("PERMISSION_DENIED");
+    const af = db.festivals.find((f) => f.id === a.festivalId);
+    if (!af || !acceptsFinancialWrites(af.status)) throw new Error("Festival is closed — records are read-only");
     const err = validateContribution(a, db.contributions, data.amount);
     if (err) throw new Error(err);
     const { newId, writeAudit } = await store();
@@ -221,6 +224,8 @@ export const softDeleteFn = createServerFn({ method: "POST" })
     const list: Array<Donation | Expense> = data.entity === "donation" ? db.donations : db.expenses;
     const rec = list.find((r) => r.id === data.id && !r.deletedAt);
     if (!rec) throw new Error("Record not found");
+    const rf = db.festivals.find((f) => f.id === rec.festivalId);
+    if (!rf || !acceptsFinancialWrites(rf.status)) throw new Error("Festival is closed — records are read-only");
     const old = JSON.stringify(rec);
     rec.deletedAt = new Date().toISOString();
     rec.deleteReason = data.reason;
@@ -232,9 +237,9 @@ export const softDeleteFn = createServerFn({ method: "POST" })
 // ---------- Notifications ----------
 export const listNotificationsFn = createServerFn({ method: "GET" }).handler(async () => {
   const { db, viewer } = await ctx();
-  if (!viewer.user) return { items: [], prefs: null };
+  if (!viewer.user) return { signedIn: false as const, items: [], prefs: null, festivals: [] };
   const prefs = db.preferences.find((p) => p.userId === viewer.user!.id) ?? null;
-  return { items: db.notifications.filter((n) => n.userId === viewer.user!.id), prefs };
+  return { signedIn: true as const, items: db.notifications.filter((n) => n.userId === viewer.user!.id), prefs, festivals: db.festivals.map((f) => ({ id: f.id, year: f.year })) };
 });
 export const markReadFn = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().nullable() }).parse(d))
