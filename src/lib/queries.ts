@@ -1,7 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import {
   getAdminFn, getFestivalsFn, getOverviewFn, getSessionFn, listAuctionsFn, listDonationsFn,
-  listExpensesFn, listGalleryFn, listNotificationsFn,
+  listExpensesFn, listGalleryFn, listNotificationsFn, getDonationFn, getExpenseFn, getAuctionFn, getYouthFn, getAdminDataFn,
 } from "./api.functions";
 
 export type ListParams = { year?: number; q?: string; scope?: "ALL" | "GENERAL" | "YOUTH"; page?: number };
@@ -15,3 +15,8 @@ export const auctionsQ = (year?: number) => queryOptions({ queryKey: ["auctions"
 export const galleryQ = (year?: number) => queryOptions({ queryKey: ["gallery", year ?? "current"], queryFn: () => listGalleryFn({ data: { year } }) });
 export const notificationsQ = () => queryOptions({ queryKey: ["notifications"], queryFn: () => listNotificationsFn() });
 export const adminQ = () => queryOptions({ queryKey: ["admin"], queryFn: () => getAdminFn() });
+export const donationQ = (id: string) => queryOptions({ queryKey: ["donation", id], queryFn: () => getDonationFn({ data: { id } }) });
+export const expenseQ = (id: string) => queryOptions({ queryKey: ["expense", id], queryFn: () => getExpenseFn({ data: { id } }) });
+export const auctionQ = (id: string) => queryOptions({ queryKey: ["auction", id], queryFn: () => getAuctionFn({ data: { id } }) });
+export const youthQ = () => queryOptions({ queryKey: ["youth"], queryFn: () => getYouthFn() });
+export const adminDataQ = () => queryOptions({ queryKey: ["adminData"], queryFn: () => getAdminDataFn() });
