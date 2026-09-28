@@ -24,6 +24,6 @@ export const Route = createFileRoute("/")({
   notFoundComponent: () => <Link to="/">Home</Link>,
   component: () => {
     const { data } = useSuspenseQuery(overviewQ());
-    return <FestivalHome year={undefined} overview={data} />;
+    return <FestivalHome overview={data} />;
   },
 });
