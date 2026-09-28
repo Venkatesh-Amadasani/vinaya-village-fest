@@ -10,12 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuctionsRouteImport } from './routes/auctions'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CurrentRouteImport } from './routes/current'
 import { Route as DonationsRouteImport } from './routes/donations'
 import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as GalleryRouteImport } from './routes/gallery'
+import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as YearsRouteImport } from './routes/years'
+import { Route as YouthRouteImport } from './routes/youth'
 import { Route as YearsIndexRouteImport } from './routes/years.index'
 import { Route as YearsYearRouteImport } from './routes/years.$year'
 
@@ -24,9 +28,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuctionsRoute = AuctionsRouteImport.update({
   id: '/auctions',
   path: '/auctions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CurrentRoute = CurrentRouteImport.update({
@@ -49,9 +63,19 @@ const GalleryRoute = GalleryRouteImport.update({
   path: '/gallery',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const YearsRoute = YearsRouteImport.update({
   id: '/years',
   path: '/years',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const YouthRoute = YouthRouteImport.update({
+  id: '/youth',
+  path: '/youth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const YearsIndexRoute = YearsIndexRouteImport.update({
@@ -67,34 +91,46 @@ const YearsYearRoute = YearsYearRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auctions': typeof AuctionsRoute
+  '/auth': typeof AuthRoute
   '/current': typeof CurrentRoute
   '/donations': typeof DonationsRoute
   '/expenses': typeof ExpensesRoute
   '/gallery': typeof GalleryRoute
+  '/notifications': typeof NotificationsRoute
   '/years': typeof YearsRouteWithChildren
+  '/youth': typeof YouthRoute
   '/years/$year': typeof YearsYearRoute
   '/years/': typeof YearsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auctions': typeof AuctionsRoute
+  '/auth': typeof AuthRoute
   '/current': typeof CurrentRoute
   '/donations': typeof DonationsRoute
   '/expenses': typeof ExpensesRoute
   '/gallery': typeof GalleryRoute
+  '/notifications': typeof NotificationsRoute
+  '/youth': typeof YouthRoute
   '/years/$year': typeof YearsYearRoute
   '/years': typeof YearsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auctions': typeof AuctionsRoute
+  '/auth': typeof AuthRoute
   '/current': typeof CurrentRoute
   '/donations': typeof DonationsRoute
   '/expenses': typeof ExpensesRoute
   '/gallery': typeof GalleryRoute
+  '/notifications': typeof NotificationsRoute
   '/years': typeof YearsRouteWithChildren
+  '/youth': typeof YouthRoute
   '/years/$year': typeof YearsYearRoute
   '/years/': typeof YearsIndexRoute
 }
@@ -102,45 +138,61 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/auctions'
+    | '/auth'
     | '/current'
     | '/donations'
     | '/expenses'
     | '/gallery'
+    | '/notifications'
     | '/years'
+    | '/youth'
     | '/years/$year'
     | '/years/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/auctions'
+    | '/auth'
     | '/current'
     | '/donations'
     | '/expenses'
     | '/gallery'
+    | '/notifications'
+    | '/youth'
     | '/years/$year'
     | '/years'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/auctions'
+    | '/auth'
     | '/current'
     | '/donations'
     | '/expenses'
     | '/gallery'
+    | '/notifications'
     | '/years'
+    | '/youth'
     | '/years/$year'
     | '/years/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AuctionsRoute: typeof AuctionsRoute
+  AuthRoute: typeof AuthRoute
   CurrentRoute: typeof CurrentRoute
   DonationsRoute: typeof DonationsRoute
   ExpensesRoute: typeof ExpensesRoute
   GalleryRoute: typeof GalleryRoute
+  NotificationsRoute: typeof NotificationsRoute
   YearsRoute: typeof YearsRouteWithChildren
+  YouthRoute: typeof YouthRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,11 +204,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auctions': {
       id: '/auctions'
       path: '/auctions'
       fullPath: '/auctions'
       preLoaderRoute: typeof AuctionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/current': {
@@ -187,11 +253,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GalleryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/years': {
       id: '/years'
       path: '/years'
       fullPath: '/years'
       preLoaderRoute: typeof YearsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/youth': {
+      id: '/youth'
+      path: '/youth'
+      fullPath: '/youth'
+      preLoaderRoute: typeof YouthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/years/': {
@@ -225,12 +305,16 @@ const YearsRouteWithChildren = YearsRoute._addFileChildren(YearsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AuctionsRoute: AuctionsRoute,
+  AuthRoute: AuthRoute,
   CurrentRoute: CurrentRoute,
   DonationsRoute: DonationsRoute,
   ExpensesRoute: ExpensesRoute,
   GalleryRoute: GalleryRoute,
+  NotificationsRoute: NotificationsRoute,
   YearsRoute: YearsRouteWithChildren,
+  YouthRoute: YouthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
