@@ -104,7 +104,7 @@ export const listDonationsFn = createServerFn({ method: "GET" })
     if (data.scope === "YOUTH") rows = rows.filter((d) => d.youthAmount > 0);
     if (q) rows = rows.filter((d) => d.donorName.toLowerCase().includes(q) || (d.village ?? "").toLowerCase().includes(q));
     rows.sort((a, b) => b.date.localeCompare(a.date));
-    return { ...paginate(rows, data.page), sum: rows.reduce((s, d) => s + d.totalAmount, 0), canSeeYouth: viewer.canSeeYouth, canAdd: can(viewer, "DONATION_ADD"), canDelete: can(viewer, "DONATION_DELETE") };
+    return { ...paginate(rows, data.page), sum: rows.reduce((s, d) => s + d.totalAmount, 0), canSeeYouth: viewer.canSeeYouth, readOnly: !acceptsFinancialWrites(festival.status), canAdd: can(viewer, "DONATION_ADD") && acceptsFinancialWrites(festival.status), canDelete: can(viewer, "DONATION_DELETE") && acceptsFinancialWrites(festival.status) };
   });
 
 export const listExpensesFn = createServerFn({ method: "GET" })
@@ -117,7 +117,7 @@ export const listExpensesFn = createServerFn({ method: "GET" })
     if (data.scope && data.scope !== "ALL") rows = rows.filter((e) => e.scope === data.scope);
     if (q) rows = rows.filter((e) => e.description.toLowerCase().includes(q) || (e.paidTo ?? "").toLowerCase().includes(q));
     rows.sort((a, b) => b.date.localeCompare(a.date));
-    return { ...paginate(rows, data.page), sum: rows.reduce((s, e) => s + e.amount, 0), categories: db.categories, canSeeYouth: viewer.canSeeYouth, canAdd: can(viewer, "EXPENSE_ADD"), canDelete: can(viewer, "EXPENSE_DELETE") };
+    return { ...paginate(rows, data.page), sum: rows.reduce((s, e) => s + e.amount, 0), categories: db.categories, canSeeYouth: viewer.canSeeYouth, readOnly: !acceptsFinancialWrites(festival.status), canAdd: can(viewer, "EXPENSE_ADD") && acceptsFinancialWrites(festival.status), canDelete: can(viewer, "EXPENSE_DELETE") && acceptsFinancialWrites(festival.status) };
   });
 
 export const listAuctionsFn = createServerFn({ method: "GET" })
@@ -126,7 +126,8 @@ export const listAuctionsFn = createServerFn({ method: "GET" })
     const { db, festival, viewer } = await ctx(data.year);
     const auctions = live(db.auctions.filter((a) => a.festivalId === festival.id));
     return {
-      canAddContribution: can(viewer, "CONTRIBUTION_ADD"),
+      readOnly: !acceptsFinancialWrites(festival.status),
+      canAddContribution: can(viewer, "CONTRIBUTION_ADD") && acceptsFinancialWrites(festival.status),
       auctions: auctions.map((a) => {
         const hideContributors = !viewer.canSeeYouth && (a.scope === "YOUTH" || a.winnerType === "GROUP");
         const cs = live(db.contributions.filter((c) => c.auctionId === a.id));
@@ -203,6 +204,8 @@ export const addContributionFn = createServerFn({ method: "POST" })
     const a = db.auctions.find((x) => x.id === data.auctionId && !x.deletedAt);
     if (!a) throw new Error("Auction not found");
     if (a.scope === "YOUTH" && !viewer.canSeeYouth) throw new Error("PERMISSION_DENIED");
+    const af = db.festivals.find((f) => f.id === a.festivalId);
+    if (!af || !acceptsFinancialWrites(af.status)) throw new Error("Festival is closed — records are read-only");
     const err = validateContribution(a, db.contributions, data.amount);
     if (err) throw new Error(err);
     const { newId, writeAudit } = await store();
@@ -221,6 +224,8 @@ export const softDeleteFn = createServerFn({ method: "POST" })
     const list: Array<Donation | Expense> = data.entity === "donation" ? db.donations : db.expenses;
     const rec = list.find((r) => r.id === data.id && !r.deletedAt);
     if (!rec) throw new Error("Record not found");
+    const rf = db.festivals.find((f) => f.id === rec.festivalId);
+    if (!rf || !acceptsFinancialWrites(rf.status)) throw new Error("Festival is closed — records are read-only");
     const old = JSON.stringify(rec);
     rec.deletedAt = new Date().toISOString();
     rec.deleteReason = data.reason;
@@ -232,9 +237,9 @@ export const softDeleteFn = createServerFn({ method: "POST" })
 // ---------- Notifications ----------
 export const listNotificationsFn = createServerFn({ method: "GET" }).handler(async () => {
   const { db, viewer } = await ctx();
-  if (!viewer.user) return { items: [], prefs: null };
+  if (!viewer.user) return { signedIn: false as const, items: [], prefs: null, festivals: [] };
   const prefs = db.preferences.find((p) => p.userId === viewer.user!.id) ?? null;
-  return { items: db.notifications.filter((n) => n.userId === viewer.user!.id), prefs };
+  return { signedIn: true as const, items: db.notifications.filter((n) => n.userId === viewer.user!.id), prefs, festivals: db.festivals.map((f) => ({ id: f.id, year: f.year })) };
 });
 export const markReadFn = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().nullable() }).parse(d))
@@ -308,4 +313,157 @@ export const announceFn = createServerFn({ method: "POST" })
     const { notify } = await store();
     notify(db.users.map((u) => u.id), { festivalId: festival.id, kind: "ANNOUNCEMENT", titleEn: data.titleEn, titleTe: data.titleTe || data.titleEn, bodyEn: data.body, bodyTe: data.body });
     return { ok: true };
+  });
+
+// ---------- Detail views (visibility enforced) ----------
+const idInput = z.object({ id: z.string().min(1).max(60) });
+const audience = (db: Awaited<ReturnType<typeof store>>["db"], recordId: string) =>
+  db.audit.filter((a) => a.recordId === recordId).map((a) => ({ ...a, actor: db.users.find((u) => u.id === a.actorId)?.name ?? a.actorId }));
+
+export const getDonationFn = createServerFn({ method: "GET" })
+  .inputValidator((d) => idInput.parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    const d = db.donations.find((x) => x.id === data.id && !x.deletedAt);
+    if (!d) throw new Error("NOT_FOUND");
+    const festival = db.festivals.find((f) => f.id === d.festivalId)!;
+    const v = resolveViewer(viewer.user, db.userPermissions, db.memberships, festival.id);
+    if (!v.canSeeYouth && d.generalAmount <= 0) throw new Error("NOT_FOUND");
+    const donation: Donation = v.canSeeYouth ? d : { ...d, scope: "GENERAL", totalAmount: d.generalAmount, youthAmount: 0, note: null };
+    return { donation, festival, canSeeYouth: v.canSeeYouth, history: v.isAdmin ? audience(db, d.id) : [] };
+  });
+
+export const getExpenseFn = createServerFn({ method: "GET" })
+  .inputValidator((d) => idInput.parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    const e = db.expenses.find((x) => x.id === data.id && !x.deletedAt);
+    if (!e) throw new Error("NOT_FOUND");
+    const festival = db.festivals.find((f) => f.id === e.festivalId)!;
+    const v = resolveViewer(viewer.user, db.userPermissions, db.memberships, festival.id);
+    if (e.scope === "YOUTH" && !v.canSeeYouth) throw new Error("NOT_FOUND");
+    return { expense: e, category: db.categories.find((c) => c.id === e.categoryId) ?? null, festival, history: v.isAdmin ? audience(db, e.id) : [] };
+  });
+
+export const getAuctionFn = createServerFn({ method: "GET" })
+  .inputValidator((d) => idInput.parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    const a = db.auctions.find((x) => x.id === data.id && !x.deletedAt);
+    if (!a) throw new Error("NOT_FOUND");
+    const festival = db.festivals.find((f) => f.id === a.festivalId)!;
+    const v = resolveViewer(viewer.user, db.userPermissions, db.memberships, festival.id);
+    const hide = !v.canSeeYouth && (a.scope === "YOUTH" || a.winnerType === "GROUP");
+    const cs = live(db.contributions.filter((c) => c.auctionId === a.id));
+    return {
+      festival,
+      readOnly: !acceptsFinancialWrites(festival.status),
+      canContribute: can(v, "CONTRIBUTION_ADD") && acceptsFinancialWrites(festival.status) && (a.scope === "GENERAL" || v.canSeeYouth),
+      view: {
+        auction: { ...a, paymentStatus: derivePaymentStatus(a, db.contributions) },
+        paid: auctionPaid(a, db.contributions), remaining: auctionRemaining(a, db.contributions), contributionCount: cs.length,
+        contributions: hide ? null : cs.map((c) => ({ id: c.id, contributorName: c.contributorName, amount: c.amount, date: c.date })),
+      },
+    };
+  });
+
+// ---------- Youth ----------
+export const getYouthFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { db, festival, viewer } = await ctx();
+  if (!viewer.canSeeYouth) return { denied: true as const };
+  const fid = festival.id;
+  const donations = live(db.donations.filter((d) => d.festivalId === fid));
+  const expenses = live(db.expenses.filter((e) => e.festivalId === fid));
+  const auctions = live(db.auctions.filter((a) => a.festivalId === fid));
+  const s = financialSummary(donations, expenses, auctions, db.contributions);
+  return {
+    denied: false as const, festival, youth: s.youth, general: s.general,
+    youthDonations: donations.filter((d) => d.youthAmount > 0).sort((a, b) => b.date.localeCompare(a.date)),
+    youthExpenses: expenses.filter((e) => e.scope === "YOUTH"),
+    categories: db.categories,
+    members: db.memberships.filter((m) => m.festivalId === fid && m.youth).map((m) => ({ ...m, name: db.users.find((u) => u.id === m.userId)?.name ?? m.userId })),
+  };
+});
+
+// ---------- Admin extras ----------
+export const getAdminDataFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { db, festival, viewer } = await ctx();
+  if (!viewer.isAdmin) return { denied: true as const };
+  const fid = festival.id;
+  return {
+    denied: false as const, festival,
+    branding: db.branding.find((b) => b.festivalId === fid)!,
+    donations: db.donations.filter((d) => d.festivalId === fid).sort((a, b) => b.date.localeCompare(a.date)),
+    expenses: db.expenses.filter((e) => e.festivalId === fid).sort((a, b) => b.date.localeCompare(a.date)),
+    categories: db.categories,
+    auctions: live(db.auctions.filter((a) => a.festivalId === fid)).map((a) => ({
+      auction: { ...a, paymentStatus: derivePaymentStatus(a, db.contributions) }, paid: auctionPaid(a, db.contributions),
+      remaining: auctionRemaining(a, db.contributions), contributionCount: live(db.contributions.filter((c) => c.auctionId === a.id)).length,
+      contributions: live(db.contributions.filter((c) => c.auctionId === a.id)).map((c) => ({ id: c.id, contributorName: c.contributorName, amount: c.amount, date: c.date })),
+    })),
+    posts: db.posts.filter((p) => p.festivalId === fid),
+    sentNotifications: db.notifications.filter((n) => n.kind === "ANNOUNCEMENT").length,
+    summary: financialSummary(db.donations.filter((d) => d.festivalId === fid), db.expenses.filter((e) => e.festivalId === fid), db.auctions.filter((a) => a.festivalId === fid), db.contributions),
+  };
+});
+
+export const setPermissionFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ userId: z.string(), permission: z.string(), enabled: z.boolean() }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, festival, viewer } = await ctx();
+    requireAdmin(viewer);
+    const { PERMISSIONS } = await import("@/domain/types");
+    const perm = PERMISSIONS.find((p) => p === data.permission);
+    if (!perm) throw new Error("Unknown permission");
+    const i = db.userPermissions.findIndex((p) => p.userId === data.userId && p.permission === perm && p.festivalId === festival.id);
+    if (data.enabled && i < 0) db.userPermissions.push({ userId: data.userId, permission: perm, festivalId: festival.id });
+    if (!data.enabled && i >= 0) db.userPermissions.splice(i, 1);
+    if (perm === "YOUTH_ACCESS") {
+      const m = db.memberships.find((x) => x.userId === data.userId && x.festivalId === festival.id);
+      if (m) { m.youth = data.enabled; m.approved = data.enabled; } else if (data.enabled) db.memberships.push({ userId: data.userId, festivalId: festival.id, youth: true, approved: true });
+    }
+    const { writeAudit } = await store();
+    writeAudit({ actorId: viewer.user!.id, action: "UPDATE", entity: "user_permission", recordId: data.userId, oldValue: null, newValue: `${perm}=${data.enabled}`, reason: null });
+    return { ok: true };
+  });
+
+export const setPostVisibilityFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string(), visibility: z.enum(["PUBLIC", "YOUTH", "ADMIN"]) }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    requireAdmin(viewer);
+    const p = db.posts.find((x) => x.id === data.id);
+    if (!p) throw new Error("Not found");
+    const { writeAudit } = await store();
+    writeAudit({ actorId: viewer.user!.id, action: "UPDATE", entity: "memory_post", recordId: p.id, oldValue: p.visibility, newValue: data.visibility, reason: null });
+    p.visibility = data.visibility;
+    return { ok: true };
+  });
+
+export const approveRecordFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => idInput.parse(d))
+  .handler(async ({ data }) => {
+    const { db, festival, viewer } = await ctx();
+    requirePerm(viewer, "APPROVE_RECORDS");
+    if (!acceptsFinancialWrites(festival.status)) throw new Error("Festival is closed — records are read-only");
+    const d = db.donations.find((x) => x.id === data.id);
+    if (!d) throw new Error("Not found");
+    d.status = "APPROVED";
+    const { writeAudit } = await store();
+    writeAudit({ actorId: viewer.user!.id, action: "APPROVE", entity: "donation", recordId: d.id, oldValue: "PENDING_APPROVAL", newValue: "APPROVED", reason: null });
+    return { ok: true };
+  });
+
+export const exportReportFn = createServerFn({ method: "GET" })
+  .inputValidator((d) => z.object({ kind: z.enum(["donations", "expenses", "auctions"]) }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, festival, viewer } = await ctx();
+    requireAdmin(viewer);
+    const esc = (v: string | number | null) => `"${String(v ?? "").replaceAll('"', '""')}"`;
+    const fid = festival.id;
+    let rows: Array<Array<string | number | null>>;
+    if (data.kind === "donations") rows = [["Date", "Donor", "Village", "Scope", "Total", "General", "Youth", "Method", "Status"], ...live(db.donations.filter((d) => d.festivalId === fid)).map((d) => [d.date, d.donorName, d.village, d.scope, d.totalAmount, d.generalAmount, d.youthAmount, d.method, d.status])];
+    else if (data.kind === "expenses") rows = [["Date", "Scope", "Category", "Description", "Amount", "Paid to"], ...live(db.expenses.filter((e) => e.festivalId === fid)).map((e) => [e.date, e.scope, db.categories.find((c) => c.id === e.categoryId)?.nameEn ?? "", e.description, e.amount, e.paidTo])];
+    else rows = [["Item", "Scope", "Winner", "Final", "Paid", "Remaining", "For year"], ...live(db.auctions.filter((a) => a.festivalId === fid)).map((a) => [a.itemEn, a.scope, a.winnerName, a.finalAmount, auctionPaid(a, db.contributions), auctionRemaining(a, db.contributions), a.forFestivalYear])];
+    return { filename: `${data.kind}-${festival.year}.csv`, csv: rows.map((r) => r.map(esc).join(",")).join("\n") };
   });

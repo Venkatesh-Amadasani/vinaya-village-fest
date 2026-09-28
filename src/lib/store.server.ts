@@ -131,6 +131,15 @@ export function notify(userIds: string[], n: Omit<AppNotification, "id" | "userI
   }
 }
 
+// Seed audit trail and festival-aware notifications for demo users
+db.audit.push(
+  { id: "al-2", actorId: "u-admin", action: "STATUS_CHANGE", entity: "festival", recordId: "f-2025", oldValue: "CLOSED", newValue: "ARCHIVED", reason: "Accounts audited and published", at: ts("2025-10-15T10:00:00+05:30") },
+  { id: "al-3", actorId: "u-admin", action: "CREATE", entity: "auction", recordId: "a-4", oldValue: null, newValue: "Next year idol sponsorship → 2027", reason: null, at: ts("2026-09-22T20:00:00+05:30") },
+);
+db.audit.sort((a, b) => b.at.localeCompare(a.at));
+notify(["u-admin", "u-youth", "u-general"], { festivalId: "f-2025", kind: "SYSTEM", titleEn: "2025 accounts archived", titleTe: "2025 లెక్కలు భద్రపరచబడ్డాయి", bodyEn: "Final 2025 report is available under Previous Years.", bodyTe: "2025 తుది నివేదిక గత సంవత్సరాలలో అందుబాటులో ఉంది." });
+db.notifications.forEach((n) => (n.read = true));
+notify(["u-admin"], { festivalId: "f-2027", kind: "SYSTEM", titleEn: "2027 festival created", titleTe: "2027 ఉత్సవం సృష్టించబడింది", bodyEn: "Idol sponsorship for 2027 was won in the 2026 auction.", bodyTe: "2027 విగ్రహ స్పాన్సర్‌షిప్ 2026 వేలంలో గెలుచుకున్నారు." });
 // Seed a few notifications for demo users
 notify(["u-admin", "u-youth", "u-general"], { festivalId: "f-2026", kind: "ANNOUNCEMENT", titleEn: "Festival 2026 is live", titleTe: "ఉత్సవాలు 2026 ప్రారంభం", bodyEn: "Follow donations and expenses openly on this site.", bodyTe: "విరాళాలు, ఖర్చులను ఈ సైట్‌లో చూడండి." });
 notify(["u-youth", "u-admin"], { festivalId: "f-2026", kind: "AUCTION", titleEn: "Youth laddu contribution recorded", titleTe: "యువత లడ్డు చెల్లింపు నమోదు", bodyEn: "₹10,000 added by Teja.", bodyTe: "తేజ ₹10,000 చెల్లించారు." });

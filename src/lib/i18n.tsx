@@ -34,6 +34,17 @@ const dict = {
   PLANNING: ["Planning", "ప్రణాళిక"], ACTIVE: ["Active", "జరుగుతోంది"], FINAL_REVIEW: ["Final review", "తుది సమీక్ష"],
   CLOSED: ["Closed", "ముగిసింది"], ARCHIVED: ["Archived", "భద్రపరచబడింది"],
   donors: ["donors", "దాతలు"], village: ["Village", "గ్రామం"], split: ["Split", "విభజన"], seeYear: ["Open year", "సంవత్సరం చూడండి"],
+  dashboard: ["Dashboard", "డాష్‌బోర్డ్"], details: ["Details", "వివరాలు"], back: ["Back", "వెనుకకు"],
+  readOnly: ["This festival is closed — records are read-only.", "ఈ ఉత్సవం ముగిసింది — రికార్డులు చదవడానికి మాత్రమే."],
+  history: ["Change history", "మార్పుల చరిత్ర"], festival: ["Festival", "ఉత్సవం"], youthDashboard: ["Youth dashboard", "యువత డాష్‌బోర్డ్"],
+  members: ["Members", "సభ్యులు"], demoAccounts: ["Choose a demo account", "డెమో ఖాతాను ఎంచుకోండి"],
+  demoAuthNote: ["Demo sign-in only. Real phone/OTP sign-in will replace this.", "డెమో లాగిన్ మాత్రమే. నిజమైన ఫోన్/OTP లాగిన్ తర్వాత వస్తుంది."],
+  unread: ["unread", "చదవనివి"], markRead: ["Mark read", "చదివినట్లు"], inApp: ["In-app notifications only (free).", "యాప్‌లో నోటిఫికేషన్లు మాత్రమే (ఉచితం)."],
+  ANNOUNCEMENT: ["Announcements", "ప్రకటనలు"], DONATION: ["Donations", "విరాళాలు"], EXPENSE: ["Expenses", "ఖర్చులు"],
+  AUCTION: ["Auctions", "వేలాలు"], APPROVAL: ["Approvals", "ఆమోదాలు"], SYSTEM: ["System", "సిస్టమ్"],
+  settings: ["Festival settings", "ఉత్సవ సెట్టింగ్‌లు"], users: ["Users & permissions", "వినియోగదారులు & అనుమతులు"],
+  memories: ["Memories & media", "జ్ఞాపకాలు & మీడియా"], records: ["Financial records", "ఆర్థిక రికార్డులు"],
+  auditLog: ["Audit log", "ఆడిట్ లాగ్"], reports: ["Reports & export", "నివేదికలు & ఎగుమతి"], overview: ["Overview", "సారాంశం"],
 } as const;
 export type Key = keyof typeof dict;
 

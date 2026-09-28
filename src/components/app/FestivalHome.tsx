@@ -12,7 +12,7 @@ import { Pill, SectionHeader } from "./bits";
 
 type Overview = Awaited<ReturnType<typeof getOverviewFn>>;
 
-export function FestivalHome({ overview: o }: { year?: number; overview: Overview }) {
+export function FestivalHome({ overview: o }: { overview: Overview }) {
   const { t, lang } = useI18n();
   const donations = useSuspenseQuery(donationsQ({})).data;
   const expenses = useSuspenseQuery(expensesQ({})).data;
