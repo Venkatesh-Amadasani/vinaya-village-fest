@@ -49,12 +49,12 @@ const names = ["Suresh Reddy", "Padma Rao", "కొండయ్య", "Srinivas N
 const methods = ["CASH", "PHONEPE", "GOOGLE_PAY", "UPI", "BANK_TRANSFER", "CASH"] as const;
 const donations: Donation[] = names.map((n, i) => {
   const scope = i % 5 === 3 ? "YOUTH" : i % 4 === 1 ? "BOTH" : "GENERAL";
-  const total = [5116, 2116, 1116, 10116, 516, 3116, 1516, 25116][i % 8];
+  const total = [5116, 2116, 1116, 10116, 516, 3116, 1516, 25116][i % 8] ?? 1116;
   const youthAmount = scope === "YOUTH" ? total : scope === "BOTH" ? Math.round(total * 0.3) : 0;
   return {
     ...base(`d-${i + 1}`, "f-2026", `2026-09-${String(1 + i).padStart(2, "0")}T10:00:00+05:30`),
     donorName: n, village: i % 3 === 0 ? "Kothapalli" : null, scope, totalAmount: total,
-    generalAmount: total - youthAmount, youthAmount, method: methods[i % 6], proofUrl: null, note: null,
+    generalAmount: total - youthAmount, youthAmount, method: methods[i % 6] ?? "CASH", proofUrl: null, note: null,
     date: `2026-09-${String(1 + i).padStart(2, "0")}`,
   };
 });

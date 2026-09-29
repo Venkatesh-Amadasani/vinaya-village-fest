@@ -288,9 +288,11 @@ export const toggleHighlightFn = createServerFn({ method: "POST" })
     const list = db.highlights.filter((h) => h.festivalId === db.highlights.find((x) => x.id === data.id)?.festivalId).sort((a, b) => a.order - b.order);
     const i = list.findIndex((h) => h.id === data.id);
     if (i < 0) throw new Error("Not found");
-    if (data.enabled !== undefined) list[i].enabled = data.enabled;
+    const cur = list[i]!;
+    if (data.enabled !== undefined) cur.enabled = data.enabled;
     const j = data.move === "up" ? i - 1 : data.move === "down" ? i + 1 : -1;
-    if (j >= 0 && j < list.length) [list[i].order, list[j].order] = [list[j].order, list[i].order];
+    const other = list[j];
+    if (other) [cur.order, other.order] = [other.order, cur.order];
     return { ok: true };
   });
 export const advanceFestivalFn = createServerFn({ method: "POST" })
