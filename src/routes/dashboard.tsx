@@ -37,7 +37,7 @@ function Page() {
       <section className="flex flex-wrap gap-2">
         {v.isAdmin ? <Pill tone="primary">ADMIN — all permissions</Pill> : v.permissions.length === 0 ? <Pill>View only</Pill> : v.permissions.map((p) => <Pill key={p}>{p}</Pill>)}
       </section>
-      <section><SectionHeader title={t("transparency")} /><FundCards fund={overview.data.summary.general} /></section>
+      <section><SectionHeader title={t("transparency")} /><FundCards fund={overview.data.general} /></section>
       <nav className="grid gap-3 sm:grid-cols-3">
         {links.map((l) => <Link key={l.to} to={l.to} className="rounded-xl border bg-card p-4 font-semibold shadow-card hover:bg-muted">{l.label}</Link>)}
       </nav>

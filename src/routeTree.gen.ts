@@ -14,6 +14,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuctionsRouteImport } from './routes/auctions'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CurrentRouteImport } from './routes/current'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DonationsRouteImport } from './routes/donations'
 import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as GalleryRouteImport } from './routes/gallery'
@@ -49,6 +50,11 @@ const AuthRoute = AuthRouteImport.update({
 const CurrentRoute = CurrentRouteImport.update({
   id: '/current',
   path: '/current',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DonationsRoute = DonationsRouteImport.update({
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/auctions': typeof AuctionsRoute
   '/auth': typeof AuthRoute
   '/current': typeof CurrentRoute
+  '/dashboard': typeof DashboardRoute
   '/donations': typeof DonationsRoute
   '/expenses': typeof ExpensesRoute
   '/gallery': typeof GalleryRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/auctions': typeof AuctionsRoute
   '/auth': typeof AuthRoute
   '/current': typeof CurrentRoute
+  '/dashboard': typeof DashboardRoute
   '/donations': typeof DonationsRoute
   '/expenses': typeof ExpensesRoute
   '/gallery': typeof GalleryRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/auctions': typeof AuctionsRoute
   '/auth': typeof AuthRoute
   '/current': typeof CurrentRoute
+  '/dashboard': typeof DashboardRoute
   '/donations': typeof DonationsRoute
   '/expenses': typeof ExpensesRoute
   '/gallery': typeof GalleryRoute
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/auctions'
     | '/auth'
     | '/current'
+    | '/dashboard'
     | '/donations'
     | '/expenses'
     | '/gallery'
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/auctions'
     | '/auth'
     | '/current'
+    | '/dashboard'
     | '/donations'
     | '/expenses'
     | '/gallery'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/auctions'
     | '/auth'
     | '/current'
+    | '/dashboard'
     | '/donations'
     | '/expenses'
     | '/gallery'
@@ -223,6 +235,7 @@ export interface RootRouteChildren {
   AuctionsRoute: typeof AuctionsRoute
   AuthRoute: typeof AuthRoute
   CurrentRoute: typeof CurrentRoute
+  DashboardRoute: typeof DashboardRoute
   DonationsRoute: typeof DonationsRoute
   ExpensesRoute: typeof ExpensesRoute
   GalleryRoute: typeof GalleryRoute
@@ -269,6 +282,13 @@ declare module '@tanstack/react-router' {
       path: '/current'
       fullPath: '/current'
       preLoaderRoute: typeof CurrentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/donations': {
@@ -369,6 +389,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuctionsRoute: AuctionsRoute,
   AuthRoute: AuthRoute,
   CurrentRoute: CurrentRoute,
+  DashboardRoute: DashboardRoute,
   DonationsRoute: DonationsRoute,
   ExpensesRoute: ExpensesRoute,
   GalleryRoute: GalleryRoute,
