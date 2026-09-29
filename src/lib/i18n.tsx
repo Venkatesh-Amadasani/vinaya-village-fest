@@ -34,7 +34,7 @@ const dict = {
   PLANNING: ["Planning", "ప్రణాళిక"], ACTIVE: ["Active", "జరుగుతోంది"], FINAL_REVIEW: ["Final review", "తుది సమీక్ష"],
   CLOSED: ["Closed", "ముగిసింది"], ARCHIVED: ["Archived", "భద్రపరచబడింది"],
   donors: ["donors", "దాతలు"], village: ["Village", "గ్రామం"], split: ["Split", "విభజన"], seeYear: ["Open year", "సంవత్సరం చూడండి"],
-  dashboard: ["Dashboard", "డాష్‌బోర్డ్"], details: ["Details", "వివరాలు"], back: ["Back", "వెనుకకు"],
+  dashboard: ["Dashboard", "డాష్‌బోర్డ్"], details: ["Details", "వివరాలు"], edit: ["Edit", "సవరించు"], myDashboard: ["My dashboard", "నా డాష్‌బోర్డ్"], demoBadge: ["Demo data", "డెమో డేటా"], back: ["Back", "వెనుకకు"],
   readOnly: ["This festival is closed — records are read-only.", "ఈ ఉత్సవం ముగిసింది — రికార్డులు చదవడానికి మాత్రమే."],
   history: ["Change history", "మార్పుల చరిత్ర"], festival: ["Festival", "ఉత్సవం"], youthDashboard: ["Youth dashboard", "యువత డాష్‌బోర్డ్"],
   members: ["Members", "సభ్యులు"], demoAccounts: ["Choose a demo account", "డెమో ఖాతాను ఎంచుకోండి"],
