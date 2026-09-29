@@ -20,6 +20,9 @@ import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as YearsRouteImport } from './routes/years'
 import { Route as YouthRouteImport } from './routes/youth'
+import { Route as AuctionsIdRouteImport } from './routes/auctions_.$id'
+import { Route as DonationsIdRouteImport } from './routes/donations_.$id'
+import { Route as ExpensesIdRouteImport } from './routes/expenses_.$id'
 import { Route as YearsIndexRouteImport } from './routes/years.index'
 import { Route as YearsYearRouteImport } from './routes/years.$year'
 
@@ -78,6 +81,21 @@ const YouthRoute = YouthRouteImport.update({
   path: '/youth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuctionsIdRoute = AuctionsIdRouteImport.update({
+  id: '/auctions_/$id',
+  path: '/auctions/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DonationsIdRoute = DonationsIdRouteImport.update({
+  id: '/donations_/$id',
+  path: '/donations/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExpensesIdRoute = ExpensesIdRouteImport.update({
+  id: '/expenses_/$id',
+  path: '/expenses/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const YearsIndexRoute = YearsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -101,6 +119,9 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/years': typeof YearsRouteWithChildren
   '/youth': typeof YouthRoute
+  '/auctions/$id': typeof AuctionsIdRoute
+  '/donations/$id': typeof DonationsIdRoute
+  '/expenses/$id': typeof ExpensesIdRoute
   '/years/$year': typeof YearsYearRoute
   '/years/': typeof YearsIndexRoute
 }
@@ -115,6 +136,9 @@ export interface FileRoutesByTo {
   '/gallery': typeof GalleryRoute
   '/notifications': typeof NotificationsRoute
   '/youth': typeof YouthRoute
+  '/auctions/$id': typeof AuctionsIdRoute
+  '/donations/$id': typeof DonationsIdRoute
+  '/expenses/$id': typeof ExpensesIdRoute
   '/years/$year': typeof YearsYearRoute
   '/years': typeof YearsIndexRoute
 }
@@ -131,6 +155,9 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/years': typeof YearsRouteWithChildren
   '/youth': typeof YouthRoute
+  '/auctions_/$id': typeof AuctionsIdRoute
+  '/donations_/$id': typeof DonationsIdRoute
+  '/expenses_/$id': typeof ExpensesIdRoute
   '/years/$year': typeof YearsYearRoute
   '/years/': typeof YearsIndexRoute
 }
@@ -148,6 +175,9 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/years'
     | '/youth'
+    | '/auctions/$id'
+    | '/donations/$id'
+    | '/expenses/$id'
     | '/years/$year'
     | '/years/'
   fileRoutesByTo: FileRoutesByTo
@@ -162,6 +192,9 @@ export interface FileRouteTypes {
     | '/gallery'
     | '/notifications'
     | '/youth'
+    | '/auctions/$id'
+    | '/donations/$id'
+    | '/expenses/$id'
     | '/years/$year'
     | '/years'
   id:
@@ -177,6 +210,9 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/years'
     | '/youth'
+    | '/auctions_/$id'
+    | '/donations_/$id'
+    | '/expenses_/$id'
     | '/years/$year'
     | '/years/'
   fileRoutesById: FileRoutesById
@@ -193,6 +229,9 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   YearsRoute: typeof YearsRouteWithChildren
   YouthRoute: typeof YouthRoute
+  AuctionsIdRoute: typeof AuctionsIdRoute
+  DonationsIdRoute: typeof DonationsIdRoute
+  ExpensesIdRoute: typeof ExpensesIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -274,6 +313,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof YouthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auctions_/$id': {
+      id: '/auctions_/$id'
+      path: '/auctions/$id'
+      fullPath: '/auctions/$id'
+      preLoaderRoute: typeof AuctionsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/donations_/$id': {
+      id: '/donations_/$id'
+      path: '/donations/$id'
+      fullPath: '/donations/$id'
+      preLoaderRoute: typeof DonationsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/expenses_/$id': {
+      id: '/expenses_/$id'
+      path: '/expenses/$id'
+      fullPath: '/expenses/$id'
+      preLoaderRoute: typeof ExpensesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/years/': {
       id: '/years/'
       path: '/'
@@ -315,6 +375,9 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   YearsRoute: YearsRouteWithChildren,
   YouthRoute: YouthRoute,
+  AuctionsIdRoute: AuctionsIdRoute,
+  DonationsIdRoute: DonationsIdRoute,
+  ExpensesIdRoute: ExpensesIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

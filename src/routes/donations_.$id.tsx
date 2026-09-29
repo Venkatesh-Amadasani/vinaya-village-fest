@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { donationQ } from "@/lib/queries";
@@ -20,7 +21,7 @@ function Page() {
   const { t } = useI18n();
   const { data } = useSuspenseQuery(donationQ(id));
   const d = data.donation;
-  const rows: [string, React.ReactNode][] = [
+  const rows: [string, ReactNode][] = [
     [t("amount"), <span className="tabular text-lg font-bold">{formatINR(d.totalAmount)}</span>],
     [t("date"), formatDate(d.date)], [t("method"), METHOD_LABEL[d.method]],
     [t("festival"), String(data.festival.year)],
