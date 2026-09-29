@@ -1,6 +1,6 @@
 // Centralized business rules. Used by both server (enforcement) and UI (guidance).
 import type {
-  Auction, AuctionContribution, Donation, Expense, FestivalMembership, FestivalStatus,
+  Auction, AuctionContribution, Donation, PaymentStatus, Expense, FestivalMembership, FestivalStatus,
   Permission, User, UserPermission, Viewer, Visibility,
 } from "./types";
 
@@ -26,7 +26,7 @@ export function auctionPaid(a: Auction, contributions: AuctionContribution[]) {
 export function auctionRemaining(a: Auction, contributions: AuctionContribution[]) {
   return round2(a.finalAmount - auctionPaid(a, contributions));
 }
-export function derivePaymentStatus(a: Auction, contributions: AuctionContribution[]) {
+export function derivePaymentStatus(a: Auction, contributions: AuctionContribution[]): PaymentStatus {
   const paid = auctionPaid(a, contributions);
   return paid <= 0 ? "PENDING" : paid >= a.finalAmount ? "PAID" : "PARTIAL";
 }

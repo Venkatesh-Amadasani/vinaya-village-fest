@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { addContributionFn, addDonationFn, addExpenseFn, softDeleteFn } from "@/lib/api.functions";
+import { addContributionFn, addDonationFn, addExpenseFn, softDeleteFn, updateDonationFn, updateExpenseFn } from "@/lib/api.functions";
 import { validateDonationSplit, round2 } from "@/domain/rules";
-import type { DonationScope, ExpenseCategory, PaymentMethod } from "@/domain/types";
+import type { Donation, DonationScope, Expense, ExpenseCategory, PaymentMethod } from "@/domain/types";
 import { formatINR, METHOD_LABEL } from "@/lib/format";
 import { pick, useI18n } from "@/lib/i18n";
 
@@ -24,10 +24,10 @@ function useRefresh() {
 }
 const msg = (e: unknown) => (e instanceof Error ? e.message : "Failed");
 
-function FormDialog({ trigger, title, open, setOpen, children }: { trigger: string; title: string; open: boolean; setOpen: (o: boolean) => void; children: ReactNode }) {
+function FormDialog({ trigger, title, open, setOpen, children, outline }: { trigger: string; title: string; open: boolean; setOpen: (o: boolean) => void; children: ReactNode; outline?: boolean }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button>{trigger}</Button></DialogTrigger>
+      <DialogTrigger asChild><Button variant={outline ? "outline" : "default"}>{trigger}</Button></DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>Demo mode — saved in memory only until the app restarts.</DialogDescription></DialogHeader>
         {children}
@@ -36,12 +36,15 @@ function FormDialog({ trigger, title, open, setOpen, children }: { trigger: stri
   );
 }
 
-export function DonationForm({ canYouth }: { canYouth: boolean }) {
+export function DonationForm({ canYouth, edit }: { canYouth: boolean; edit?: Donation }) {
   const { t } = useI18n();
   const refresh = useRefresh();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState({ donorName: "", village: "", scope: "GENERAL" as DonationScope, total: "", general: "", youth: "", method: "CASH" as PaymentMethod, date: today() });
+  const [reason, setReason] = useState("");
+  const [f, setF] = useState(edit
+    ? { donorName: edit.donorName, village: edit.village ?? "", scope: edit.scope, total: String(edit.totalAmount), general: String(edit.generalAmount), youth: String(edit.youthAmount), method: edit.method, date: edit.date.slice(0, 10) }
+    : { donorName: "", village: "", scope: "GENERAL" as DonationScope, total: "", general: "", youth: "", method: "CASH" as PaymentMethod, date: today() });
   const total = Number(f.total) || 0;
   const generalAmount = f.scope === "GENERAL" ? total : f.scope === "YOUTH" ? 0 : Number(f.general) || 0;
   const youthAmount = f.scope === "YOUTH" ? total : f.scope === "GENERAL" ? 0 : Number(f.youth) || 0;
@@ -51,13 +54,15 @@ export function DonationForm({ canYouth }: { canYouth: boolean }) {
     if (splitError || !f.donorName.trim()) return;
     setBusy(true);
     try {
-      await addDonationFn({ data: { donorName: f.donorName, village: f.village.trim() || null, scope: f.scope, totalAmount: total, generalAmount, youthAmount, method: f.method, date: f.date } });
-      toast.success("Donation recorded");
+      const payload = { donorName: f.donorName, village: f.village.trim() || null, scope: f.scope, totalAmount: total, generalAmount, youthAmount, method: f.method, date: f.date };
+      if (edit) await updateDonationFn({ data: { ...payload, id: edit.id, reason } });
+      else await addDonationFn({ data: payload });
+      toast.success(edit ? "Donation updated" : "Donation recorded");
       setOpen(false); await refresh();
     } catch (err) { toast.error(msg(err)); } finally { setBusy(false); }
   }
   return (
-    <FormDialog trigger={t("addDonation")} title={t("addDonation")} open={open} setOpen={setOpen}>
+    <FormDialog trigger={edit ? t("edit") : t("addDonation")} title={edit ? t("edit") : t("addDonation")} open={open} setOpen={setOpen} outline={!!edit}>
       <form onSubmit={submit} className="space-y-4">
         <Field label={t("donor")}><Input required maxLength={120} value={f.donorName} onChange={(e) => setF({ ...f, donorName: e.target.value })} /></Field>
         <Field label={t("village")}><Input maxLength={80} value={f.village} onChange={(e) => setF({ ...f, village: e.target.value })} /></Field>
@@ -80,29 +85,35 @@ export function DonationForm({ canYouth }: { canYouth: boolean }) {
           <Field label={t("method")}><select className={selectCls} value={f.method} onChange={(e) => setF({ ...f, method: e.target.value as PaymentMethod })}>{METHODS.map((m) => <option key={m} value={m}>{METHOD_LABEL[m]}</option>)}</select></Field>
           <Field label={t("date")}><Input type="date" required value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></Field>
         </div>
+        {edit && <Field label="Reason for change (required)"><Input required minLength={3} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>}
         <Button type="submit" className="h-11 w-full" disabled={busy || !!splitError}>{t("save")} {total > 0 && `· ${formatINR(total)}`}</Button>
       </form>
     </FormDialog>
   );
 }
 
-export function ExpenseForm({ canYouth, categories }: { canYouth: boolean; categories: ExpenseCategory[] }) {
+export function ExpenseForm({ canYouth, categories, edit }: { canYouth: boolean; categories: ExpenseCategory[]; edit?: Expense }) {
   const { t, lang } = useI18n();
   const refresh = useRefresh();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState({ scope: "GENERAL" as "GENERAL" | "YOUTH", categoryId: categories[0]?.id ?? "", description: "", amount: "", paidTo: "", date: today() });
+  const [reason, setReason] = useState("");
+  const [f, setF] = useState(edit
+    ? { scope: edit.scope, categoryId: edit.categoryId, description: edit.description, amount: String(edit.amount), paidTo: edit.paidTo ?? "", date: edit.date.slice(0, 10) }
+    : { scope: "GENERAL" as "GENERAL" | "YOUTH", categoryId: categories[0]?.id ?? "", description: "", amount: "", paidTo: "", date: today() });
   const cats = categories.filter((c) => c.scope === "ANY" || c.scope === f.scope);
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      await addExpenseFn({ data: { scope: f.scope, categoryId: f.categoryId, description: f.description, amount: Number(f.amount), paidTo: f.paidTo.trim() || null, date: f.date } });
-      toast.success("Expense recorded"); setOpen(false); await refresh();
+      const payload = { scope: f.scope, categoryId: f.categoryId, description: f.description, amount: Number(f.amount), paidTo: f.paidTo.trim() || null, date: f.date };
+      if (edit) await updateExpenseFn({ data: { ...payload, id: edit.id, reason } });
+      else await addExpenseFn({ data: payload });
+      toast.success(edit ? "Expense updated" : "Expense recorded"); setOpen(false); await refresh();
     } catch (err) { toast.error(msg(err)); } finally { setBusy(false); }
   }
   return (
-    <FormDialog trigger={t("addExpense")} title={t("addExpense")} open={open} setOpen={setOpen}>
+    <FormDialog trigger={edit ? t("edit") : t("addExpense")} title={edit ? t("edit") : t("addExpense")} open={open} setOpen={setOpen} outline={!!edit}>
       <form onSubmit={submit} className="space-y-4">
         {canYouth && <Field label={t("split")}><select className={selectCls} value={f.scope} onChange={(e) => setF({ ...f, scope: e.target.value as "GENERAL" | "YOUTH" })}><option value="GENERAL">{t("general")}</option><option value="YOUTH">{t("youth")}</option></select></Field>}
         <Field label={t("category")}><select className={selectCls} value={f.categoryId} onChange={(e) => setF({ ...f, categoryId: e.target.value })}>{cats.map((c) => <option key={c.id} value={c.id}>{pick(lang, c.nameEn, c.nameTe)}</option>)}</select></Field>
@@ -112,6 +123,7 @@ export function ExpenseForm({ canYouth, categories }: { canYouth: boolean; categ
           <Field label={t("date")}><Input type="date" required value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></Field>
         </div>
         <Field label={t("paidTo")}><Input maxLength={120} value={f.paidTo} onChange={(e) => setF({ ...f, paidTo: e.target.value })} /></Field>
+        {edit && <Field label="Reason for change (required)"><Input required minLength={3} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>}
         <Button type="submit" className="h-11 w-full" disabled={busy}>{t("save")}</Button>
       </form>
     </FormDialog>

@@ -288,9 +288,11 @@ export const toggleHighlightFn = createServerFn({ method: "POST" })
     const list = db.highlights.filter((h) => h.festivalId === db.highlights.find((x) => x.id === data.id)?.festivalId).sort((a, b) => a.order - b.order);
     const i = list.findIndex((h) => h.id === data.id);
     if (i < 0) throw new Error("Not found");
-    if (data.enabled !== undefined) list[i].enabled = data.enabled;
+    const cur = list[i]!;
+    if (data.enabled !== undefined) cur.enabled = data.enabled;
     const j = data.move === "up" ? i - 1 : data.move === "down" ? i + 1 : -1;
-    if (j >= 0 && j < list.length) [list[i].order, list[j].order] = [list[j].order, list[i].order];
+    const other = list[j];
+    if (other) [cur.order, other.order] = [other.order, cur.order];
     return { ok: true };
   });
 export const advanceFestivalFn = createServerFn({ method: "POST" })
@@ -330,7 +332,8 @@ export const getDonationFn = createServerFn({ method: "GET" })
     const v = resolveViewer(viewer.user, db.userPermissions, db.memberships, festival.id);
     if (!v.canSeeYouth && d.generalAmount <= 0) throw new Error("NOT_FOUND");
     const donation: Donation = v.canSeeYouth ? d : { ...d, scope: "GENERAL", totalAmount: d.generalAmount, youthAmount: 0, note: null };
-    return { donation, festival, canSeeYouth: v.canSeeYouth, history: v.isAdmin ? audience(db, d.id) : [] };
+    const canEdit = can(v, "DONATION_EDIT") && acceptsFinancialWrites(festival.status) && (d.scope === "GENERAL" || v.canSeeYouth);
+    return { donation, festival, canSeeYouth: v.canSeeYouth, canEdit, history: v.isAdmin ? audience(db, d.id) : [] };
   });
 
 export const getExpenseFn = createServerFn({ method: "GET" })
@@ -342,7 +345,8 @@ export const getExpenseFn = createServerFn({ method: "GET" })
     const festival = db.festivals.find((f) => f.id === e.festivalId)!;
     const v = resolveViewer(viewer.user, db.userPermissions, db.memberships, festival.id);
     if (e.scope === "YOUTH" && !v.canSeeYouth) throw new Error("NOT_FOUND");
-    return { expense: e, category: db.categories.find((c) => c.id === e.categoryId) ?? null, festival, history: v.isAdmin ? audience(db, e.id) : [] };
+    const canEdit = can(v, "EXPENSE_EDIT") && acceptsFinancialWrites(festival.status);
+    return { expense: e, category: db.categories.find((c) => c.id === e.categoryId) ?? null, categories: db.categories, canSeeYouth: v.canSeeYouth, canEdit, festival, history: v.isAdmin ? audience(db, e.id) : [] };
   });
 
 export const getAuctionFn = createServerFn({ method: "GET" })
@@ -466,4 +470,54 @@ export const exportReportFn = createServerFn({ method: "GET" })
     else if (data.kind === "expenses") rows = [["Date", "Scope", "Category", "Description", "Amount", "Paid to"], ...live(db.expenses.filter((e) => e.festivalId === fid)).map((e) => [e.date, e.scope, db.categories.find((c) => c.id === e.categoryId)?.nameEn ?? "", e.description, e.amount, e.paidTo])];
     else rows = [["Item", "Scope", "Winner", "Final", "Paid", "Remaining", "For year"], ...live(db.auctions.filter((a) => a.festivalId === fid)).map((a) => [a.itemEn, a.scope, a.winnerName, a.finalAmount, auctionPaid(a, db.contributions), auctionRemaining(a, db.contributions), a.forFestivalYear])];
     return { filename: `${data.kind}-${festival.year}.csv`, csv: rows.map((r) => r.map(esc).join(",")).join("\n") };
+  });
+
+// ---------- Edits (audited; old + new values recorded) ----------
+const donationFields = z.object({
+  donorName: z.string().trim().min(1).max(120), village: z.string().trim().max(80).nullable(),
+  scope: z.enum(["GENERAL", "YOUTH", "BOTH"]), totalAmount: z.number().positive().max(10_000_000),
+  generalAmount: z.number().min(0), youthAmount: z.number().min(0), method, date: z.string().min(10).max(10),
+});
+export const updateDonationFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => donationFields.extend({ id: z.string(), reason: z.string().trim().min(3).max(300) }).parse(d))
+  .handler(async ({ data }) => {
+    const { db } = await ctx();
+    const d = db.donations.find((x) => x.id === data.id && !x.deletedAt);
+    if (!d) throw new Error("NOT_FOUND");
+    const festival = db.festivals.find((f) => f.id === d.festivalId)!;
+    const { viewer } = await ctx(festival.year);
+    requirePerm(viewer, "DONATION_EDIT");
+    if ((d.scope !== "GENERAL" || data.scope !== "GENERAL") && !viewer.canSeeYouth) throw new Error("PERMISSION_DENIED");
+    if (!acceptsFinancialWrites(festival.status)) throw new Error("Festival is read-only");
+    const { id, reason, ...fields } = data;
+    const err = validateDonationSplit(fields);
+    if (err) throw new Error(err);
+    const old = JSON.stringify(d);
+    Object.assign(d, fields);
+    const { writeAudit } = await store();
+    writeAudit({ actorId: viewer.user!.id, action: "UPDATE", entity: "donation", recordId: id, oldValue: old, newValue: JSON.stringify(fields), reason });
+    return { ok: true };
+  });
+
+export const updateExpenseFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    id: z.string(), reason: z.string().trim().min(3).max(300),
+    scope: z.enum(["GENERAL", "YOUTH"]), categoryId: z.string(), description: z.string().trim().min(1).max(200),
+    amount: z.number().positive().max(10_000_000), paidTo: z.string().trim().max(120).nullable(), date: z.string().min(10).max(10),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { db } = await ctx();
+    const e = db.expenses.find((x) => x.id === data.id && !x.deletedAt);
+    if (!e) throw new Error("NOT_FOUND");
+    const festival = db.festivals.find((f) => f.id === e.festivalId)!;
+    const { viewer } = await ctx(festival.year);
+    requirePerm(viewer, "EXPENSE_EDIT");
+    if ((e.scope === "YOUTH" || data.scope === "YOUTH") && !viewer.canSeeYouth) throw new Error("PERMISSION_DENIED");
+    if (!acceptsFinancialWrites(festival.status)) throw new Error("Festival is read-only");
+    const { id, reason, ...fields } = data;
+    const old = JSON.stringify(e);
+    Object.assign(e, fields);
+    const { writeAudit } = await store();
+    writeAudit({ actorId: viewer.user!.id, action: "UPDATE", entity: "expense", recordId: id, oldValue: old, newValue: JSON.stringify(fields), reason });
+    return { ok: true };
   });

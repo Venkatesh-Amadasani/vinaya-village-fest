@@ -34,7 +34,7 @@ export function DonationList({ rows, showSplit, onDelete }: { rows: Donation[]; 
           {rows.map((d) => (
             <tr key={d.id} className="flex flex-wrap items-center gap-x-3 px-4 py-3 sm:table-row sm:p-0">
               <td className="flex-1 sm:px-4 sm:py-3">
-                <div className="font-semibold">{d.donorName}</div>
+                <Link to="/donations/$id" params={{ id: d.id }} className="font-semibold hover:underline">{d.donorName}</Link>
                 <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                   {d.village && <span>{d.village}</span>}
                   {showSplit && d.scope !== "GENERAL" && <Pill tone="youth">{d.scope === "BOTH" ? `${t("general")} ${formatINR(d.generalAmount)} · ${t("youth")} ${formatINR(d.youthAmount)}` : t("youth")}</Pill>}
@@ -64,7 +64,7 @@ export function ExpenseList({ rows, categories, onDelete }: { rows: Expense[]; c
         return (
           <li key={e.id} className="flex items-center gap-3 px-4 py-3">
             <div className="flex-1">
-              <div className="font-semibold">{e.description}</div>
+              <Link to="/expenses/$id" params={{ id: e.id }} className="font-semibold hover:underline">{e.description}</Link>
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 {c && <Pill>{pick(lang, c.nameEn, c.nameTe)}</Pill>}
                 {e.scope === "YOUTH" && <Pill tone="youth">{t("youth")}</Pill>}
@@ -92,7 +92,7 @@ export function AuctionCard({ v, onContribute }: { v: AuctionView; onContribute?
   return (
     <article className="flex flex-col rounded-xl border bg-card p-5 shadow-card">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-lg font-semibold">{pick(lang, a.itemEn, a.itemTe)}</h3>
+        <h3 className="text-lg font-semibold"><Link to="/auctions/$id" params={{ id: a.id }} className="hover:underline">{pick(lang, a.itemEn, a.itemTe)}</Link></h3>
         <StatusPill status={a.paymentStatus} />
       </div>
       <div className="mt-1 flex flex-wrap gap-1.5 text-xs">

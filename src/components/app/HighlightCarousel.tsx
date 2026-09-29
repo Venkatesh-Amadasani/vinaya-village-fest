@@ -14,8 +14,8 @@ export function HighlightCarousel({ items }: { items: Highlight[] }) {
     const id = setInterval(() => setI((x) => (x + 1) % items.length), 5000);
     return () => clearInterval(id);
   }, [paused, items.length]);
-  if (items.length === 0) return null;
-  const h = items[i % items.length];
+  const h = items[i % Math.max(items.length, 1)];
+  if (!h) return null;
   const img = resolveImage(h.image);
   return (
     <section aria-roledescription="carousel" aria-label={t("highlights")} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}

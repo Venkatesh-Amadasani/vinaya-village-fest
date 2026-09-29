@@ -7,7 +7,7 @@ import { sessionQ } from "@/lib/queries";
 import { setDemoUserFn } from "@/lib/api.functions";
 import { cn } from "@/lib/utils";
 
-type NavItem = { to: "/" | "/donations" | "/expenses" | "/auctions" | "/gallery" | "/years" | "/youth" | "/admin"; key: Key; icon: typeof Home };
+type NavItem = { to: "/" | "/donations" | "/expenses" | "/auctions" | "/gallery" | "/years" | "/youth" | "/admin" | "/dashboard"; key: Key; icon: typeof Home };
 const PUBLIC_NAV: NavItem[] = [
   { to: "/", key: "home", icon: Home }, { to: "/donations", key: "donations", icon: HandCoins },
   { to: "/expenses", key: "expenses", icon: Receipt }, { to: "/auctions", key: "auctions", icon: Gavel },
@@ -34,6 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const viewer = data?.viewer;
   const nav: NavItem[] = [
     ...PUBLIC_NAV,
+    ...(viewer?.user ? [{ to: "/dashboard", key: "dashboard", icon: Home } as NavItem] : []),
     ...(viewer?.canSeeYouth ? [{ to: "/youth", key: "youth", icon: Users } as NavItem] : []),
     ...(viewer?.isAdmin ? [{ to: "/admin", key: "admin", icon: ShieldCheck } as NavItem] : []),
   ];
