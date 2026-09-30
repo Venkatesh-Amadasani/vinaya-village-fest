@@ -280,6 +280,17 @@ export const getAdminFn = createServerFn({ method: "GET" }).handler(async () => 
     audit: db.audit.slice(0, 50).map((a) => ({ ...a, actor: db.users.find((u) => u.id === a.actorId)?.name ?? a.actorId })),
   };
 });
+export const addCategoryFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ nameEn: z.string().trim().min(1).max(60), nameTe: z.string().trim().min(1).max(60), scope: z.enum(["GENERAL", "YOUTH", "ANY"]) }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    requireAdmin(viewer);
+    const { newId, writeAudit } = await store();
+    const cat = { id: newId("c"), ...data };
+    db.categories.push(cat);
+    writeAudit({ actorId: viewer.user!.id, action: "CREATE", entity: "expense_category", recordId: cat.id, oldValue: null, newValue: JSON.stringify(data), reason: null });
+    return cat;
+  });
 export const toggleHighlightFn = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string(), enabled: z.boolean().optional(), move: z.enum(["up", "down"]).optional() }).parse(d))
   .handler(async ({ data }) => {
