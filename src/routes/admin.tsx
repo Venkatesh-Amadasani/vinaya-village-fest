@@ -3,7 +3,24 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { adminQ, adminDataQ } from "@/lib/queries";
-import { advanceFestivalFn, announceFn, approveRecordFn, exportReportFn, setPermissionFn, setPostVisibilityFn, toggleHighlightFn } from "@/lib/api.functions";
+import { addCategoryFn, advanceFestivalFn, announceFn, approveRecordFn, exportReportFn, setPermissionFn, setPostVisibilityFn, toggleHighlightFn } from "@/lib/api.functions";
+import type { ExpenseCategory } from "@/domain/types";
+
+function CategoryManager({ categories, onAdd }: { categories: ExpenseCategory[]; onAdd: (c: { nameEn: string; nameTe: string; scope: "GENERAL" | "YOUTH" | "ANY" }) => void }) {
+  const [en, setEn] = useState(""); const [te, setTe] = useState(""); const [scope, setScope] = useState<"GENERAL" | "YOUTH" | "ANY">("ANY");
+  return (<div className="rounded-xl border bg-card p-4">
+    <h3 className="mb-2 font-semibold">Expense categories · ఖర్చు వర్గాలు</h3>
+    <div className="mb-3 flex flex-wrap gap-2">{categories.map((c) => <Pill key={c.id}>{c.nameEn} / {c.nameTe} · {c.scope}</Pill>)}</div>
+    <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); if (!en.trim() || !te.trim()) return; onAdd({ nameEn: en, nameTe: te, scope }); setEn(""); setTe(""); }}>
+      <Input className="max-w-44" placeholder="Name (English)" value={en} onChange={(e) => setEn(e.target.value)} maxLength={60} />
+      <Input className="max-w-44" placeholder="పేరు (తెలుగు)" value={te} onChange={(e) => setTe(e.target.value)} maxLength={60} />
+      <select className="h-10 rounded-md border bg-background px-2" value={scope} onChange={(e) => setScope(e.target.value as "GENERAL" | "YOUTH" | "ANY")} aria-label="Scope">
+        <option value="ANY">Any</option><option value="GENERAL">General</option><option value="YOUTH">Youth</option>
+      </select>
+      <Button type="submit">Add</Button>
+    </form>
+  </div>);
+}
 import { LIFECYCLE } from "@/domain/rules";
 import { PERMISSIONS } from "@/domain/types";
 import { pick, useI18n, type Key } from "@/lib/i18n";
@@ -47,7 +64,8 @@ function Page() {
     {tab === "settings" && <div className="space-y-3">{a.festivals.map((f) => (
       <div key={f.id} className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4"><b className="font-display text-2xl">{f.year}</b><span className="flex-1">{f.name}</span><Pill tone={f.isCurrent ? "primary" : "muted"}>{t(f.status)}</Pill>
         {f.id === d.festival.id && next && <Button variant="outline" onClick={() => { const reason = window.prompt("Reason for status change"); if (reason) void run(advanceFestivalFn({ data: { id: f.id, to: next, reason } })); }}>→ {t(next)}</Button>}
-      </div>))}</div>}
+      </div>))}
+      <CategoryManager categories={d.categories} onAdd={(c) => void run(addCategoryFn({ data: c }))} /></div>}
     {tab === "users" && <div className="space-y-4">{a.users.map((u) => (
       <div key={u.id} className="rounded-xl border bg-card p-4"><div className="mb-2 flex gap-2"><b>{u.name}</b><Pill>{u.role}</Pill></div>
         {u.role === "ADMIN" ? <p className="text-sm text-muted-foreground">Admins have all permissions.</p> :
