@@ -386,6 +386,17 @@ export const getYouthFn = createServerFn({ method: "GET" }).handler(async () => 
     youthExpenses: expenses.filter((e) => e.scope === "YOUTH"),
     categories: db.categories,
     members: db.memberships.filter((m) => m.festivalId === fid && m.youth).map((m) => ({ ...m, name: db.users.find((u) => u.id === m.userId)?.name ?? m.userId })),
+    combined: { donations: s.general.donations + s.youth.donations, collected: s.general.auctionCollected + s.youth.auctionCollected, expenses: s.general.expenses + s.youth.expenses, balance: s.general.balance + s.youth.balance },
+    youthAuctions: auctions.filter((a) => a.scope === "YOUTH").map((a) => ({
+      id: a.id, itemEn: a.itemEn, itemTe: a.itemTe, winnerName: a.winnerName, finalAmount: a.finalAmount,
+      paid: auctionPaid(a, db.contributions), remaining: auctionRemaining(a, db.contributions), status: derivePaymentStatus(a, db.contributions),
+      contributions: live(db.contributions.filter((c) => c.auctionId === a.id)).map((c) => ({ id: c.id, contributorName: c.contributorName, amount: c.amount, date: c.date })),
+    })),
+    youthPosts: db.posts.filter((p) => p.festivalId === fid && p.visibility === "YOUTH").map((p) => ({ id: p.id, titleEn: p.titleEn, titleTe: p.titleTe, body: p.body, mediaCount: p.media.length })),
+    youthLogs: db.audit.filter((l) => {
+      const ids = new Set([...donations.filter((d) => d.youthAmount > 0).map((d) => d.id), ...expenses.filter((e) => e.scope === "YOUTH").map((e) => e.id), ...auctions.filter((a) => a.scope === "YOUTH").map((a) => a.id)]);
+      return ids.has(l.recordId);
+    }).slice(0, 20).map((l) => ({ id: l.id, action: l.action, entity: l.entity, reason: l.reason, at: l.at, actor: db.users.find((u) => u.id === l.actorId)?.name ?? l.actorId })),
   };
 });
 
