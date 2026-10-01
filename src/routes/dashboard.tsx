@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { sessionQ, overviewQ } from "@/lib/queries";
+import { sessionQ, overviewQ, youthQ } from "@/lib/queries";
 import { useI18n } from "@/lib/i18n";
-import { FundCards } from "@/components/app/Finance";
+import { FundCards, KpiCard } from "@/components/app/Finance";
 import { PageSkeleton, Pill, SectionHeader } from "@/components/app/bits";
 
 export const Route = createFileRoute("/dashboard")({
@@ -14,6 +14,7 @@ function Page() {
   const { t } = useI18n();
   const session = useQuery(sessionQ());
   const overview = useQuery(overviewQ());
+  const youth = useQuery({ ...youthQ(), enabled: !!session.data?.viewer.canSeeYouth });
   if (!session.data || !overview.data) return <PageSkeleton />;
   const v = session.data.viewer;
   if (!v.user) return (
@@ -38,6 +39,14 @@ function Page() {
         {v.isAdmin ? <Pill tone="primary">ADMIN — all permissions</Pill> : v.permissions.length === 0 ? <Pill>View only</Pill> : v.permissions.map((p) => <Pill key={p}>{p}</Pill>)}
       </section>
       <section><SectionHeader title={t("transparency")} /><FundCards fund={overview.data.general} /></section>
+      {youth.data && !youth.data.denied && (
+        <section><SectionHeader title="Combined (General + Youth)" />
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <KpiCard label={t("donations")} value={youth.data.combined.donations} /><KpiCard label="Auction collected" value={youth.data.combined.collected} />
+            <KpiCard label={t("expenses")} value={youth.data.combined.expenses} /><KpiCard label="Balance" value={youth.data.combined.balance} tone="primary" />
+          </div>
+        </section>
+      )}
       <nav className="grid gap-3 sm:grid-cols-3">
         {links.map((l) => <Link key={l.to} to={l.to} className="rounded-xl border bg-card p-4 font-semibold shadow-card hover:bg-muted">{l.label}</Link>)}
       </nav>
