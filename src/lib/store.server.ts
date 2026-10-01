@@ -31,9 +31,9 @@ let branding: FestivalBranding[] = [
   }
 ];
 let users: User[] = [
-  { id: "74400a08-12ef-48d6-9be4-da5022b333b1", name: "Admin", phone: "9999999999", role: "ADMIN", village: "Chinnagollapalli", preferredLanguage: "en", createdAt: "2026-01-01T00:00:00.000Z" },
-  { id: "64ce6798-b1b7-4a45-aa2f-9e7956802ea7", name: "Ravi Kumar", phone: "9000000002", role: "GENERAL", village: "Chinnagollapalli", preferredLanguage: "te", createdAt: "2026-01-01T00:00:00.000Z" },
-  { id: "0819d743-52f5-48f1-9a32-e659686df531", name: "Lakshmi Devi", phone: "9000000003", role: "GENERAL", village: "Chinnagollapalli", preferredLanguage: "te", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "74400a08-12ef-48d6-9be4-da5022b333b1", name: "Admin", phone: "9999999999", role: "ADMIN", active: true },
+  { id: "64ce6798-b1b7-4a45-aa2f-9e7956802ea7", name: "Ravi Kumar", phone: "9000000002", role: "GENERAL", active: true },
+  { id: "0819d743-52f5-48f1-9a32-e659686df531", name: "Lakshmi Devi", phone: "9000000003", role: "GENERAL", active: true },
 ];
 let userPermissions: UserPermission[] = [
   { userId: "64ce6798-b1b7-4a45-aa2f-9e7956802ea7", permission: "YOUTH_ACCESS", festivalId: null },

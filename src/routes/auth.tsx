@@ -45,7 +45,7 @@ function Page() {
 
   if (!data) return <PageSkeleton />;
 
-  const current = data.viewer.user ?? null;
+  const current = data?.viewer?.user ?? null;
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,10 +59,11 @@ function Page() {
         },
       });
       await qc.invalidateQueries();
+      const displayName = res?.user?.name || identifier.trim();
       toast.success(
         lang === "te"
-          ? `స్వాగతం ${res.user.name}! విజయవంతంగా లాగిన్ అయ్యారు.`
-          : `Welcome ${res.user.name}! Signed in successfully.`
+          ? `స్వాగతం ${displayName}! విజయవంతంగా లాగిన్ అయ్యారు.`
+          : `Welcome ${displayName}! Signed in successfully.`
       );
       await nav({ to: "/" });
     } catch (err: any) {
@@ -123,10 +124,11 @@ function Page() {
         },
       });
       await qc.invalidateQueries();
+      const displayName = res?.user?.name || name.trim();
       toast.success(
         lang === "te"
-          ? `నమోదు విజయవంతమైంది! స్వాగతం ${res.user.name}.`
-          : `Registration successful! Welcome ${res.user.name}.`
+          ? `నమోదు విజయవంతమైంది! స్వాగతం ${displayName}.`
+          : `Registration successful! Welcome ${displayName}.`
       );
       await nav({ to: "/" });
     } catch (err: any) {
@@ -180,7 +182,7 @@ function Page() {
               </p>
               <h4 className="font-bold text-base flex items-center gap-2 mt-0.5">
                 <span>{current.name}</span>
-                <Pill tone={current.role === "ADMIN" ? "primary" : data.viewer.canSeeYouth ? "youth" : "muted"}>
+                <Pill tone={current.role === "ADMIN" ? "primary" : data?.viewer?.canSeeYouth ? "youth" : "muted"}>
                   {current.role === "ADMIN"
                     ? (lang === "te" ? "నిర్వాహకులు" : "Admin")
                     : data.viewer.canSeeYouth

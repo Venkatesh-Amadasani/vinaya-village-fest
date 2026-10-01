@@ -19,10 +19,10 @@ function Page() {
   const logout = useSwitchUser();
   const session = useQuery(sessionQ());
   const overview = useQuery(overviewQ());
-  const youth = useQuery({ ...youthQ(), enabled: !!session.data?.viewer.canSeeYouth });
+  const youth = useQuery({ ...youthQ(), enabled: !!session.data?.viewer?.canSeeYouth });
   if (!session.data || !overview.data) return <PageSkeleton />;
-  const v = session.data.viewer;
-  if (!v.user) return (
+  const v = session.data?.viewer;
+  if (!v?.user) return (
     <div className="mx-auto max-w-md rounded-xl border bg-card p-6 text-center shadow-card">
       <p className="mb-4">{t("signIn")}</p>
       <Link to="/auth" className="inline-flex h-11 items-center rounded-full bg-primary px-6 font-semibold text-primary-foreground">{t("signIn")}</Link>
@@ -31,13 +31,13 @@ function Page() {
   const links = [
     { to: "/donations" as const, label: t("donations") }, { to: "/expenses" as const, label: t("expenses") },
     { to: "/auctions" as const, label: t("auctions") }, { to: "/notifications" as const, label: t("notifications") },
-    ...(v.canSeeYouth ? [{ to: "/youth" as const, label: t("youthDashboard") }] : []),
-    ...(v.isAdmin ? [{ to: "/admin" as const, label: t("admin") }] : []),
+    ...(v?.canSeeYouth ? [{ to: "/youth" as const, label: t("youthDashboard") }] : []),
+    ...(v?.isAdmin ? [{ to: "/admin" as const, label: t("admin") }] : []),
   ];
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <SectionHeader title={`${t("myDashboard")} · ${v.user.name}`} sub={v.isAdmin ? t("admin") : v.canSeeYouth ? t("youth") : t("general")} />
+        <SectionHeader title={`${t("myDashboard")} · ${v.user?.name || "Devotee"}`} sub={v?.isAdmin ? t("admin") : v?.canSeeYouth ? t("youth") : t("general")} />
         <button
           type="button"
           onClick={async () => {
@@ -55,7 +55,7 @@ function Page() {
         {t("demoBadge")}: {t("demoSignInNote")}
       </div>
       <section className="flex flex-wrap gap-2">
-        {v.isAdmin ? <Pill tone="primary">ADMIN — all permissions</Pill> : v.permissions.length === 0 ? <Pill>View only</Pill> : v.permissions.map((p) => <Pill key={p}>{p}</Pill>)}
+        {v?.isAdmin ? <Pill tone="primary">ADMIN — all permissions</Pill> : (v?.permissions || []).length === 0 ? <Pill>View only</Pill> : (v?.permissions || []).map((p) => <Pill key={p}>{p}</Pill>)}
       </section>
       <section><SectionHeader title={t("transparency")} /><FundCards fund={overview.data.general} /></section>
       {youth.data && !youth.data.denied && (() => {
