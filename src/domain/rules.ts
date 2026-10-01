@@ -36,21 +36,29 @@ export function validateContribution(a: Auction, contributions: AuctionContribut
   return null;
 }
 
-export function financialSummary(donations: Donation[], expenses: Expense[], auctions: Auction[], contributions: AuctionContribution[]) {
+export function financialSummary(
+  donations: Donation[],
+  expenses: Expense[],
+  auctions: Auction[],
+  contributions: AuctionContribution[],
+  previousBalance: { general: number; youth: number } = { general: 0, youth: 0 }
+) {
   const d = live(donations), e = live(expenses), a = live(auctions);
   const general = {
+    openingBalance: previousBalance.general || 0,
     donations: d.reduce((s, x) => s + x.generalAmount, 0),
     auctionCommitted: a.filter((x) => x.scope === "GENERAL").reduce((s, x) => s + x.finalAmount, 0),
     auctionCollected: a.filter((x) => x.scope === "GENERAL").reduce((s, x) => s + auctionPaid(x, contributions), 0),
     expenses: e.filter((x) => x.scope === "GENERAL").reduce((s, x) => s + x.amount, 0),
   };
   const youth = {
+    openingBalance: previousBalance.youth || 0,
     donations: d.reduce((s, x) => s + x.youthAmount, 0),
     auctionCommitted: a.filter((x) => x.scope === "YOUTH").reduce((s, x) => s + x.finalAmount, 0),
     auctionCollected: a.filter((x) => x.scope === "YOUTH").reduce((s, x) => s + auctionPaid(x, contributions), 0),
     expenses: e.filter((x) => x.scope === "YOUTH").reduce((s, x) => s + x.amount, 0),
   };
-  const bal = (g: typeof general) => round2(g.donations + g.auctionCollected - g.expenses);
+  const bal = (g: typeof general) => round2(g.openingBalance + g.donations + g.auctionCollected - g.expenses);
   return { general: { ...general, balance: bal(general) }, youth: { ...youth, balance: bal(youth) } };
 }
 export type FinancialSummary = ReturnType<typeof financialSummary>;
@@ -69,7 +77,7 @@ export function resolveViewer(user: User | null, perms: UserPermission[], member
     .filter((p) => p.userId === user.id && (p.festivalId === null || p.festivalId === festivalId))
     .map((p) => p.permission);
   const member = memberships.find((m) => m.userId === user.id && m.festivalId === festivalId && m.youth && m.approved);
-  const canSeeYouth = isAdmin || (!!member && permissions.includes("YOUTH_ACCESS"));
+  const canSeeYouth = isAdmin || permissions.includes("YOUTH_ACCESS") || (!!member && member.approved);
   return { user, permissions, isAdmin, canSeeYouth };
 }
 export const can = (v: Viewer, p: Permission) => v.isAdmin || v.permissions.includes(p);

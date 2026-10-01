@@ -1,7 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { LogOut } from "lucide-react";
+import { toast } from "sonner";
 import { sessionQ, overviewQ, youthQ } from "@/lib/queries";
 import { useI18n } from "@/lib/i18n";
+import { useSwitchUser } from "@/components/app/AppShell";
 import { FundCards } from "@/components/app/Finance";
 import { KpiCard, PageSkeleton, Pill, SectionHeader } from "@/components/app/bits";
 
@@ -11,7 +14,9 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Page() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const router = useRouter();
+  const logout = useSwitchUser();
   const session = useQuery(sessionQ());
   const overview = useQuery(overviewQ());
   const youth = useQuery({ ...youthQ(), enabled: !!session.data?.viewer.canSeeYouth });
@@ -31,7 +36,21 @@ function Page() {
   ];
   return (
     <div className="space-y-8">
-      <SectionHeader title={`${t("myDashboard")} · ${v.user.name}`} sub={v.isAdmin ? t("admin") : v.canSeeYouth ? t("youth") : t("general")} />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <SectionHeader title={`${t("myDashboard")} · ${v.user.name}`} sub={v.isAdmin ? t("admin") : v.canSeeYouth ? t("youth") : t("general")} />
+        <button
+          type="button"
+          onClick={async () => {
+            await logout(null);
+            toast.success(lang === "te" ? "విజయవంతంగా లాగ్ అవుట్ అయ్యారు" : "Logged out successfully");
+            await router.navigate({ to: "/" });
+          }}
+          className="inline-flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>{lang === "te" ? "లాగ్ అవుట్" : "Logout"}</span>
+        </button>
+      </div>
       <div className="rounded-lg border border-dashed bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
         {t("demoBadge")}: {t("demoSignInNote")}
       </div>

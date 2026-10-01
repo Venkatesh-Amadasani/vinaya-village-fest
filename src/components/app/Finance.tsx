@@ -9,10 +9,21 @@ import { KpiCard, Pill, StatusPill, EmptyState } from "./bits";
 type Fund = FinancialSummary["general"];
 
 export function FundCards({ fund, youth = false }: { fund: Fund; youth?: boolean }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const openingSub = fund.openingBalance && fund.openingBalance > 0
+    ? `${lang === "te" ? "గత సంవత్సరం నుండి" : "From previous year"}: ${formatINR(fund.openingBalance)}`
+    : undefined;
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <div className="col-span-2 lg:col-span-1"><KpiCard tone={youth ? "youth" : "primary"} label={t("balance")} value={fund.balance} icon={<Wallet className="h-4 w-4" aria-hidden />} /></div>
+      <div className="col-span-2 lg:col-span-1">
+        <KpiCard
+          tone={youth ? "youth" : "primary"}
+          label={t("balance")}
+          value={fund.balance}
+          sub={openingSub}
+          icon={<Wallet className="h-4 w-4" aria-hidden />}
+        />
+      </div>
       <KpiCard label={t("collected")} value={fund.donations} icon={<HandCoins className="h-4 w-4" aria-hidden />} />
       <KpiCard label={t("auctionCollected")} value={fund.auctionCollected} sub={`${t("auctionCommitted")}: ${formatINR(fund.auctionCommitted)}`} icon={<Gavel className="h-4 w-4" aria-hidden />} />
       <KpiCard label={t("spent")} value={fund.expenses} icon={<Receipt className="h-4 w-4" aria-hidden />} />
@@ -21,7 +32,7 @@ export function FundCards({ fund, youth = false }: { fund: Fund; youth?: boolean
 }
 
 export function DonationList({ rows, showSplit, onDelete }: { rows: Donation[]; showSplit: boolean; onDelete?: (d: Donation) => void }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   if (rows.length === 0) return <EmptyState />;
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-card">
@@ -31,23 +42,26 @@ export function DonationList({ rows, showSplit, onDelete }: { rows: Donation[]; 
           <tr><th className="px-4 py-3">{t("donor")}</th><th className="px-4 py-3">{t("date")}</th><th className="px-4 py-3">{t("method")}</th><th className="px-4 py-3 text-right">{t("amount")}</th>{onDelete && <th className="px-2" />}</tr>
         </thead>
         <tbody className="divide-y">
-          {rows.map((d) => (
-            <tr key={d.id} className="flex flex-wrap items-center gap-x-3 px-4 py-3 sm:table-row sm:p-0">
-              <td className="flex-1 sm:px-4 sm:py-3">
-                <Link to="/donations/$id" params={{ id: d.id }} className="font-semibold hover:underline">{d.donorName}</Link>
-                <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                  {d.village && <span>{d.village}</span>}
-                  {showSplit && d.scope !== "GENERAL" && <Pill tone="youth">{d.scope === "BOTH" ? `${t("general")} ${formatINR(d.generalAmount)} · ${t("youth")} ${formatINR(d.youthAmount)}` : t("youth")}</Pill>}
-                  {d.status === "PENDING_APPROVAL" && <Pill tone="warn">Pending approval</Pill>}
-                  <span className="sm:hidden">{formatDate(d.date)} · {METHOD_LABEL[d.method]}</span>
-                </div>
-              </td>
+          {rows.map((d) => {
+            const donorName = lang === "te" ? (d.donorNameTe || d.donorName) : (d.donorName || d.donorNameTe);
+            return (
+              <tr key={d.id} className="flex flex-wrap items-center gap-x-3 px-4 py-3 sm:table-row sm:p-0">
+                <td className="flex-1 sm:px-4 sm:py-3">
+                  <Link to="/donations/$id" params={{ id: d.id }} className="font-semibold hover:underline">{donorName}</Link>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                    {d.village && <span>{d.village}</span>}
+                    {showSplit && d.scope !== "GENERAL" && <Pill tone="youth">{d.scope === "BOTH" ? `${t("general")} ${formatINR(d.generalAmount)} · ${t("youth")} ${formatINR(d.youthAmount)}` : t("youth")}</Pill>}
+                    {d.status === "PENDING_APPROVAL" && <Pill tone="warn">Pending approval</Pill>}
+                    <span className="sm:hidden">{formatDate(d.date)} · {METHOD_LABEL[d.method]}</span>
+                  </div>
+                </td>
               <td className="hidden text-sm text-muted-foreground sm:table-cell sm:px-4">{formatDate(d.date)}</td>
               <td className="hidden text-sm sm:table-cell sm:px-4">{METHOD_LABEL[d.method]}</td>
               <td className="tabular text-right text-lg font-bold sm:px-4">{formatINR(d.totalAmount)}</td>
               {onDelete && <td className="sm:px-2"><button className="text-xs text-destructive underline" onClick={() => onDelete(d)}>{t("delete")}</button></td>}
             </tr>
-          ))}
+          );
+        })}
         </tbody>
       </table>
     </div>

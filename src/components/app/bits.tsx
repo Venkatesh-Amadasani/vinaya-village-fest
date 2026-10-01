@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatINR } from "@/lib/format";
 import { useI18n, type Key } from "@/lib/i18n";
 
-export function KpiCard({ label, value, tone = "default", sub, icon }: { label: string; value: number; tone?: "default" | "primary" | "success" | "youth"; sub?: string; icon?: ReactNode }) {
+export function KpiCard({ label, value, tone = "default", sub, icon }: { label: string; value: number; tone?: "default" | "primary" | "success" | "youth" | undefined; sub?: string | undefined; icon?: ReactNode | undefined }) {
   return (
     <div className={cn("rounded-xl border bg-card p-4 shadow-card sm:p-5", tone === "primary" && "border-transparent bg-festive text-primary-foreground", tone === "youth" && "border-youth/30")}>
       <div className={cn("flex items-center gap-2 text-sm font-medium", tone === "primary" ? "text-primary-foreground/90" : "text-muted-foreground")}>
@@ -19,7 +19,7 @@ export function KpiCard({ label, value, tone = "default", sub, icon }: { label: 
   );
 }
 
-export function SectionHeader({ title, sub, action }: { title: string; sub?: string; action?: ReactNode }) {
+export function SectionHeader({ title, sub, action }: { title: string; sub?: string | undefined; action?: ReactNode | undefined }) {
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>

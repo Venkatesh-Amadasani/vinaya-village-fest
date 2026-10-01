@@ -107,6 +107,42 @@
   height: 12px;
 }
 
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@utility animate-marquee {
+  display: inline-flex;
+  width: max-content;
+  animation: marquee 28s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee {
+  display: inline-flex;
+  width: max-content;
+  animation: marquee 28s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+@keyframes slide-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+@utility animate-progress {
+  animation: slide-progress 4.5s linear;
+}
+
+.animate-progress {
+  animation: slide-progress 4.5s linear;
+}
+
 @layer base {
   * { border-color: var(--color-border); }
   body { background-color: var(--color-background); color: var(--color-foreground); font-family: var(--font-sans); line-height: 1.6; }

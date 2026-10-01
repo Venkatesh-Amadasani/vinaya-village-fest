@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Home, HandCoins, Receipt, Gavel, Images, ShieldCheck, Users, History } from "lucide-react";
+import { Bell, Home, HandCoins, Receipt, Gavel, Images, ShieldCheck, Users, History, LogOut } from "lucide-react";
+import { toast } from "sonner";
 import { useI18n, type Key } from "@/lib/i18n";
 import { sessionQ } from "@/lib/queries";
 import { setDemoUserFn } from "@/lib/api.functions";
@@ -29,9 +30,15 @@ export function LanguageSwitch() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const router = useRouter();
+  const logout = useSwitchUser();
   const { data } = useQuery(sessionQ());
   const viewer = data?.viewer;
+  // Dynamic site name and logo from session (pulled from branding)
+  const siteNameEn = (data as any)?.siteName?.en || "Chinnagollapalli Vinayaka Chavithi";
+  const siteNameTe = (data as any)?.siteName?.te || "చిన్నగొల్లపల్లి వినాయక చవితి";
+  const logoUrl: string | null = (data as any)?.logoUrl || null;
   const nav: NavItem[] = [
     ...PUBLIC_NAV,
     ...(viewer?.user ? [{ to: "/dashboard", key: "dashboard", icon: Home } as NavItem] : []),
@@ -46,8 +53,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
           <Link to="/" className="flex items-center gap-2">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-festive font-display text-lg text-primary-foreground" aria-hidden>ॐ</span>
-            <span className="hidden font-display text-lg leading-tight sm:block">Vinayaka Chavithi<br /><span className="text-xs text-muted-foreground">వినాయక చవితి</span></span>
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+            ) : (
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-festive font-display text-lg text-primary-foreground" aria-hidden>ॐ</span>
+            )}
+            <span className="hidden font-display text-lg leading-tight sm:block">{lang === "te" ? siteNameTe : siteNameEn}</span>
           </Link>
           <nav className="ml-4 hidden flex-1 items-center gap-1 lg:flex" aria-label="Main">
             {nav.map((n) => (
@@ -61,10 +72,25 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="ml-auto flex items-center gap-2">
             <LanguageSwitch />
             {viewer?.user ? (
-              <Link to="/notifications" className="relative rounded-full border bg-card p-2.5" aria-label={`${t("notifications")} (${data?.unread ?? 0})`}>
-                <Bell className="h-5 w-5" />
-                {!!data?.unread && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{data.unread}</span>}
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link to="/notifications" className="relative rounded-full border bg-card p-2.5 hover:bg-muted" aria-label={`${t("notifications")} (${data?.unread ?? 0})`}>
+                  <Bell className="h-5 w-5" />
+                  {!!data?.unread && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{data.unread}</span>}
+                </Link>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await logout(null);
+                    toast.success(lang === "te" ? "విజయవంతంగా లాగ్ అవుట్ అయ్యారు" : "Logged out successfully");
+                    await router.navigate({ to: "/" });
+                  }}
+                  className="flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all shadow-xs"
+                  title={lang === "te" ? "లాగ్ అవుట్" : "Logout"}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{lang === "te" ? "లాగ్ అవుట్" : "Logout"}</span>
+                </button>
+              </div>
             ) : (
               <Link to="/auth" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{t("signIn")}</Link>
             )}
@@ -89,6 +115,13 @@ export function useSwitchUser() {
   const qc = useQueryClient();
   const router = useRouter();
   return async (userId: string | null) => {
+    if (typeof document !== "undefined") {
+      if (userId) {
+        document.cookie = `vvc_demo_uid=${userId}; path=/; max-age=31536000; SameSite=Lax`;
+      } else {
+        document.cookie = `vvc_demo_uid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+      }
+    }
     await setDemoUserFn({ data: { userId } });
     await qc.invalidateQueries();
     await router.invalidate();

@@ -33,7 +33,9 @@ export interface FestivalMembership { userId: ID; festivalId: ID; youth: boolean
 /** festival_branding */
 export interface FestivalBranding {
   festivalId: ID; nameEn: string; nameTe: string; taglineEn: string; taglineTe: string;
+  siteNameEn: string; siteNameTe: string;
   idolImage: string | null; bannerImage: string | null; logo: string | null; accentHue: number;
+  openingBalanceGeneral: number; openingBalanceYouth: number;
 }
 /** festivals */
 export interface Festival {
@@ -47,7 +49,7 @@ interface FinancialBase {
 
 /** donations */
 export interface Donation extends FinancialBase {
-  donorName: string; village: string | null; scope: DonationScope;
+  donorName: string; donorNameTe: string | null; village: string | null; scope: DonationScope;
   totalAmount: number; generalAmount: number; youthAmount: number;
   method: PaymentMethod; proofUrl: string | null; note: string | null; date: ISODate;
 }

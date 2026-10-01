@@ -7,17 +7,27 @@ import {
   acceptsFinancialWrites, auctionPaid, auctionRemaining, can, canTransition, canView,
   derivePaymentStatus, financialSummary, live, resolveViewer, validateContribution, validateDonationSplit,
 } from "@/domain/rules";
-import type { Donation, Expense, NotificationKind, Permission, Viewer } from "@/domain/types";
+import type { Auction, Donation, Expense, Festival, FestivalBranding, Highlight, MemoryPost, NotificationKind, Permission, Viewer } from "@/domain/types";
+
+const defaultBranding: FestivalBranding = {
+  festivalId: "", nameEn: "Sri Vinayaka Chavithi", nameTe: "శ్రీ వినాయక చవితి",
+  taglineEn: "Every rupee accounted, every devotee welcome", taglineTe: "ప్రతి రూపాయి లెక్క, ప్రతి భక్తుడికి స్వాగతం",
+  siteNameEn: "Chinnagollapalli Vinayaka Chavithi", siteNameTe: "చిన్నగొల్లపల్లి వినాయక చవితి",
+  idolImage: null, bannerImage: null, logo: null, accentHue: 38, openingBalanceGeneral: 0, openingBalanceYouth: 0
+};
 
 const DEMO_COOKIE = "vvc_demo_uid";
 const PAGE = 10;
 const store = () => import("./store.server");
 
 async function ctx(year?: number) {
-  const { db } = await store();
+  const { ensureDb } = await store();
+  const db = await ensureDb();
   const { getCookie } = await import("@tanstack/react-start/server");
   const festival =
-    (year ? db.festivals.find((f) => f.year === year) : undefined) ?? db.festivals.find((f) => f.isCurrent)!;
+    ((year ? db.festivals.find((f) => f.year === year) : undefined) ?? 
+    db.festivals.find((f) => f.isCurrent) ?? 
+    db.festivals[0])!;
   const uid = getCookie(DEMO_COOKIE);
   const user = db.users.find((u) => u.id === uid) ?? null;
   const viewer = resolveViewer(user, db.userPermissions, db.memberships, festival.id);
@@ -29,29 +39,54 @@ function requirePerm(v: Viewer, p: Permission) {
 const yearInput = z.object({ year: z.number().int().optional() });
 
 export const getSessionFn = createServerFn({ method: "GET" }).handler(async () => {
-  const { db, viewer } = await ctx();
+  const { db, festival, viewer } = await ctx();
   const unread = viewer.user ? db.notifications.filter((n) => n.userId === viewer.user!.id && !n.read).length : 0;
-  return { viewer, unread, demoUsers: db.users.map((u) => ({ id: u.id, name: u.name, role: u.role })) };
+  const branding = db.branding.find((b) => b.festivalId === festival?.id) ?? db.branding[0];
+  const siteName = {
+    en: branding?.siteNameEn || branding?.nameEn || "Chinnagollapalli Vinayaka Chavithi",
+    te: branding?.siteNameTe || branding?.nameTe || "చిన్నగొల్లపల్లి వినాయక చవితి",
+  };
+  const logoUrl = branding?.logo ?? null;
+  return {
+    viewer,
+    unread,
+    demoUsers: db.users.map((u) => {
+      const isYouth = db.userPermissions.some((p) => p.userId === u.id && p.permission === "YOUTH_ACCESS");
+      return {
+        id: u.id,
+        name: u.name,
+        role: u.role,
+        isYouth,
+        subtitleEn: u.role === "ADMIN" ? "Admin" : isYouth ? "Youth Member" : "General Devotee",
+        subtitleTe: u.role === "ADMIN" ? "నిర్వాహకులు" : isYouth ? "యువత సభ్యుడు" : "సాధారణ భక్తుడు",
+      };
+    }),
+    siteName,
+    logoUrl,
+  };
 });
 
 export const setDemoUserFn = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ userId: z.string().nullable() }).parse(d))
   .handler(async ({ data }) => {
     const { setCookie, deleteCookie } = await import("@tanstack/react-start/server");
-    if (data.userId) setCookie(DEMO_COOKIE, data.userId, { path: "/", httpOnly: true, sameSite: "lax" });
+    if (data.userId) setCookie(DEMO_COOKIE, data.userId, { path: "/", httpOnly: false, sameSite: "lax", maxAge: 31536000 });
     else deleteCookie(DEMO_COOKIE, { path: "/" });
     return { ok: true };
   });
 
 export const getFestivalsFn = createServerFn({ method: "GET" }).handler(async () => {
-  const { db } = await store();
+  const { ensureDb } = await store();
+  const db = await ensureDb();
   return db.festivals
     .map((f) => {
+      const b = db.branding.find((b) => b.festivalId === f.id) ?? db.branding[0] ?? defaultBranding;
       const summary = financialSummary(
         db.donations.filter((d) => d.festivalId === f.id), db.expenses.filter((e) => e.festivalId === f.id),
         db.auctions.filter((a) => a.festivalId === f.id), db.contributions,
+        { general: b.openingBalanceGeneral ?? 0, youth: b.openingBalanceYouth ?? 0 }
       );
-      return { festival: f, branding: db.branding.find((b) => b.festivalId === f.id)!, general: summary.general };
+      return { festival: f, branding: b, general: summary.general };
     })
     .sort((a, b) => b.festival.year - a.festival.year);
 });
@@ -64,14 +99,18 @@ export const getOverviewFn = createServerFn({ method: "GET" })
     const donations = live(db.donations.filter((d) => d.festivalId === fid));
     const expenses = live(db.expenses.filter((e) => e.festivalId === fid));
     const auctions = live(db.auctions.filter((a) => a.festivalId === fid));
-    const summary = financialSummary(donations, expenses, auctions, db.contributions);
+    const branding = db.branding.find((b) => b.festivalId === fid) ?? db.branding[0] ?? defaultBranding;
+    const summary = financialSummary(donations, expenses, auctions, db.contributions, {
+      general: branding?.openingBalanceGeneral ?? 0,
+      youth: branding?.openingBalanceYouth ?? 0,
+    });
     const byCategory = (scope: "GENERAL" | "YOUTH") =>
       db.categories
         .map((c) => ({ id: c.id, nameEn: c.nameEn, nameTe: c.nameTe, amount: expenses.filter((e) => e.scope === scope && e.categoryId === c.id).reduce((s, e) => s + e.amount, 0) }))
         .filter((c) => c.amount > 0);
     return {
       festival,
-      branding: db.branding.find((b) => b.festivalId === fid)!,
+      branding,
       viewer,
       general: summary.general,
       youth: viewer.canSeeYouth ? summary.youth : null,
@@ -102,7 +141,7 @@ export const listDonationsFn = createServerFn({ method: "GET" })
     }
     if (data.scope === "GENERAL") rows = rows.filter((d) => d.generalAmount > 0);
     if (data.scope === "YOUTH") rows = rows.filter((d) => d.youthAmount > 0);
-    if (q) rows = rows.filter((d) => d.donorName.toLowerCase().includes(q) || (d.village ?? "").toLowerCase().includes(q));
+    if (q) rows = rows.filter((d) => d.donorName.toLowerCase().includes(q) || (d.donorNameTe ?? "").toLowerCase().includes(q) || (d.village ?? "").toLowerCase().includes(q));
     rows.sort((a, b) => b.date.localeCompare(a.date));
     return { ...paginate(rows, data.page), sum: rows.reduce((s, d) => s + d.totalAmount, 0), canSeeYouth: viewer.canSeeYouth, readOnly: !acceptsFinancialWrites(festival.status), canAdd: can(viewer, "DONATION_ADD") && acceptsFinancialWrites(festival.status), canDelete: can(viewer, "DONATION_DELETE") && acceptsFinancialWrites(festival.status) };
   });
@@ -154,7 +193,8 @@ const method = z.enum(["CASH", "PHONEPE", "GOOGLE_PAY", "UPI", "BANK_TRANSFER", 
 
 export const addDonationFn = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
-    donorName: z.string().trim().min(1).max(120), village: z.string().trim().max(80).nullable(),
+    donorName: z.string().trim().min(1).max(120), donorNameTe: z.string().trim().max(120).nullable().optional(),
+    village: z.string().trim().max(80).nullable(),
     scope: z.enum(["GENERAL", "YOUTH", "BOTH"]), totalAmount: z.number().positive().max(10_000_000),
     generalAmount: z.number().min(0), youthAmount: z.number().min(0), method, date: z.string().min(10).max(10),
   }).parse(d))
@@ -165,12 +205,13 @@ export const addDonationFn = createServerFn({ method: "POST" })
     if (!acceptsFinancialWrites(festival.status)) throw new Error("Festival is not accepting changes");
     const err = validateDonationSplit(data);
     if (err) throw new Error(err);
-    const { newId, writeAudit, notify } = await store();
+    const { newId, writeAudit, notify, persistDonation } = await store();
     const rec: Donation = {
-      ...data, id: newId("d"), festivalId: festival.id, createdBy: viewer.user!.id, createdAt: new Date().toISOString(),
-      status: viewer.isAdmin ? "APPROVED" : "PENDING_APPROVAL", deletedAt: null, deleteReason: null, proofUrl: null, note: null,
+      ...data, donorNameTe: data.donorNameTe || null, id: newId("d"), festivalId: festival.id, createdBy: viewer.user!.id, createdAt: new Date().toISOString(),
+      status: "APPROVED", deletedAt: null, deleteReason: null, proofUrl: null, note: null,
     };
     db.donations.push(rec);
+    await persistDonation(rec);
     writeAudit({ actorId: viewer.user!.id, action: "CREATE", entity: "donation", recordId: rec.id, oldValue: null, newValue: JSON.stringify(data), reason: null });
     notify(db.users.filter((u) => u.role === "ADMIN" && u.id !== viewer.user!.id).map((u) => u.id), {
       festivalId: festival.id, kind: "DONATION", titleEn: "New donation recorded", titleTe: "కొత్త విరాళం నమోదు",
@@ -189,9 +230,10 @@ export const addExpenseFn = createServerFn({ method: "POST" })
     requirePerm(viewer, "EXPENSE_ADD");
     if (data.scope === "YOUTH" && !viewer.canSeeYouth) throw new Error("PERMISSION_DENIED");
     if (!acceptsFinancialWrites(festival.status)) throw new Error("Festival is not accepting changes");
-    const { newId, writeAudit } = await store();
+    const { newId, writeAudit, persistExpense } = await store();
     const rec: Expense = { ...data, id: newId("e"), festivalId: festival.id, createdBy: viewer.user!.id, createdAt: new Date().toISOString(), status: "APPROVED", deletedAt: null, deleteReason: null, receiptUrl: null };
     db.expenses.push(rec);
+    await persistExpense(rec);
     writeAudit({ actorId: viewer.user!.id, action: "CREATE", entity: "expense", recordId: rec.id, oldValue: null, newValue: JSON.stringify(data), reason: null });
     return { id: rec.id };
   });
@@ -208,10 +250,12 @@ export const addContributionFn = createServerFn({ method: "POST" })
     if (!af || !acceptsFinancialWrites(af.status)) throw new Error("Festival is closed — records are read-only");
     const err = validateContribution(a, db.contributions, data.amount);
     if (err) throw new Error(err);
-    const { newId, writeAudit } = await store();
+    const { newId, writeAudit, persistContribution } = await store();
     const today = new Date().toISOString().slice(0, 10);
     const id = newId("ac");
-    db.contributions.push({ ...data, id, festivalId: festival.id, createdBy: viewer.user!.id, createdAt: new Date().toISOString(), status: "APPROVED", deletedAt: null, deleteReason: null, date: today });
+    const rec = { ...data, id, festivalId: festival.id, createdBy: viewer.user!.id, createdAt: new Date().toISOString(), status: "APPROVED" as const, deletedAt: null, deleteReason: null, date: today };
+    db.contributions.push(rec);
+    await persistContribution(rec);
     writeAudit({ actorId: viewer.user!.id, action: "CREATE", entity: "auction_contribution", recordId: id, oldValue: null, newValue: JSON.stringify(data), reason: null });
     return { id };
   });
@@ -229,7 +273,8 @@ export const softDeleteFn = createServerFn({ method: "POST" })
     const old = JSON.stringify(rec);
     rec.deletedAt = new Date().toISOString();
     rec.deleteReason = data.reason;
-    const { writeAudit } = await store();
+    const { writeAudit, persistSoftDelete } = await store();
+    await persistSoftDelete(data.entity, data.id, data.reason);
     writeAudit({ actorId: viewer.user!.id, action: "SOFT_DELETE", entity: data.entity, recordId: rec.id, oldValue: old, newValue: null, reason: data.reason });
     return { ok: true };
   });
@@ -274,10 +319,23 @@ export const getAdminFn = createServerFn({ method: "GET" }).handler(async () => 
   if (!viewer.isAdmin) return { denied: true as const };
   return {
     denied: false as const,
-    festivals: db.festivals.map((f) => ({ ...f, name: db.branding.find((b) => b.festivalId === f.id)!.nameEn })),
+    festivals: db.festivals.map((f) => {
+      const b = db.branding.find((b) => b.festivalId === f.id);
+      return {
+        ...f,
+        name: b?.nameEn || `Festival ${f.year}`,
+        nameEn: b?.nameEn || `Festival ${f.year}`,
+        nameTe: b?.nameTe || `ఉత్సవం ${f.year}`,
+        openingBalanceGeneral: b?.openingBalanceGeneral || 0,
+        openingBalanceYouth: b?.openingBalanceYouth || 0,
+      };
+    }).sort((a, b) => b.year - a.year),
     highlights: [...db.highlights].sort((a, b) => a.order - b.order),
     users: db.users.map((u) => ({ ...u, permissions: db.userPermissions.filter((p) => p.userId === u.id).map((p) => p.permission) })),
-    audit: db.audit.slice(0, 50).map((a) => ({ ...a, actor: db.users.find((u) => u.id === a.actorId)?.name ?? a.actorId })),
+    audit: db.audit.slice(0, 50).map((a) => {
+      const u = db.users.find((u) => u.id === a.actorId);
+      return { ...a, actor: u?.role === "ADMIN" ? "Admin" : (u?.name ?? a.actorId) };
+    }),
   };
 });
 export const addCategoryFn = createServerFn({ method: "POST" })
@@ -285,9 +343,10 @@ export const addCategoryFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db, viewer } = await ctx();
     requireAdmin(viewer);
-    const { newId, writeAudit } = await store();
+    const { newId, writeAudit, persistCategory } = await store();
     const cat = { id: newId("c"), ...data };
     db.categories.push(cat);
+    await persistCategory(cat);
     writeAudit({ actorId: viewer.user!.id, action: "CREATE", entity: "expense_category", recordId: cat.id, oldValue: null, newValue: JSON.stringify(data), reason: null });
     return cat;
   });
@@ -304,18 +363,230 @@ export const toggleHighlightFn = createServerFn({ method: "POST" })
     const j = data.move === "up" ? i - 1 : data.move === "down" ? i + 1 : -1;
     const other = list[j];
     if (other) [cur.order, other.order] = [other.order, cur.order];
+    const { persistHighlight } = await store();
+    await persistHighlight(cur);
+    if (other) await persistHighlight(other);
     return { ok: true };
   });
 export const advanceFestivalFn = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ id: z.string(), to: z.enum(["PLANNING", "ACTIVE", "FINAL_REVIEW", "CLOSED", "ARCHIVED"]), reason: z.string().trim().min(3) }).parse(d))
+  .inputValidator((d) => z.object({ id: z.string(), to: z.enum(["PLANNING", "ACTIVE", "FINAL_REVIEW", "CLOSED", "ARCHIVED"]), reason: z.string().trim().optional() }).parse(d))
   .handler(async ({ data }) => {
     const { db, viewer } = await ctx();
     requireAdmin(viewer);
     const f = db.festivals.find((x) => x.id === data.id);
-    if (!f || !canTransition(f.status, data.to)) throw new Error("Invalid lifecycle transition");
-    const { writeAudit } = await store();
-    writeAudit({ actorId: viewer.user!.id, action: "STATUS_CHANGE", entity: "festival", recordId: f.id, oldValue: f.status, newValue: data.to, reason: data.reason });
+    if (!f) throw new Error("Festival not found");
+    const { writeAudit, persistStatus } = await store();
+    writeAudit({ actorId: viewer.user!.id, action: "STATUS_CHANGE", entity: "festival", recordId: f.id, oldValue: f.status, newValue: data.to, reason: data.reason || "Status updated" });
     f.status = data.to;
+    await persistStatus(f.id, data.to);
+    return { ok: true };
+  });
+
+export const addFestivalFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    year: z.number().int().min(2000).max(2100),
+    nameEn: z.string().trim().min(1).max(200),
+    nameTe: z.string().trim().max(200).optional(),
+    startDate: z.string().min(10).max(10).optional(),
+    endDate: z.string().min(10).max(10).optional(),
+    status: z.enum(["PLANNING", "ACTIVE", "FINAL_REVIEW", "CLOSED", "ARCHIVED"]).default("PLANNING"),
+    isCurrent: z.boolean().default(false),
+    carryForwardFromYear: z.number().int().optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    requireAdmin(viewer);
+    if (db.festivals.some((f) => f.year === data.year)) {
+      throw new Error(`Festival for year ${data.year} already exists`);
+    }
+
+    const { newId, writeAudit, persistNewFestival, persistSetCurrentFestival } = await store();
+    const id = newId("f");
+    const startDate = data.startDate || `${data.year}-09-01`;
+    const endDate = data.endDate || `${data.year}-09-11`;
+    const nameEn = data.nameEn;
+    const nameTe = data.nameTe || data.nameEn;
+
+    let opGen = 0;
+    let opYouth = 0;
+    if (data.carryForwardFromYear) {
+      const prevFest = db.festivals.find((f) => f.year === data.carryForwardFromYear);
+      if (prevFest) {
+        const donations = live(db.donations.filter((d) => d.festivalId === prevFest.id));
+        const expenses = live(db.expenses.filter((e) => e.festivalId === prevFest.id));
+        const auctions = live(db.auctions.filter((a) => a.festivalId === prevFest.id));
+        const b = db.branding.find((x) => x.festivalId === prevFest.id);
+        const s = financialSummary(donations, expenses, auctions, db.contributions, {
+          general: b?.openingBalanceGeneral || 0,
+          youth: b?.openingBalanceYouth || 0,
+        });
+        opGen = s.general.balance;
+        opYouth = s.youth.balance;
+      }
+    }
+
+    if (data.isCurrent) {
+      for (const f of db.festivals) {
+        f.isCurrent = false;
+      }
+    }
+
+    const newFest: Festival = {
+      id,
+      year: data.year,
+      status: data.status,
+      startDate,
+      endDate,
+      isCurrent: data.isCurrent,
+    };
+    db.festivals.unshift(newFest);
+
+    const newBranding: FestivalBranding = {
+      festivalId: id,
+      nameEn,
+      nameTe,
+      taglineEn: "Every rupee accounted, every devotee welcome",
+      taglineTe: "ప్రతి రూపాయి లెక్క, ప్రతి భక్తుడికి స్వాగతం",
+      siteNameEn: "Chinnagollapalli Vinayaka Chavithi",
+      siteNameTe: "చిన్నగొల్లపల్లి వినాయక చవితి",
+      idolImage: null,
+      bannerImage: null,
+      logo: null,
+      accentHue: 38,
+      openingBalanceGeneral: opGen,
+      openingBalanceYouth: opYouth,
+    };
+    db.branding.unshift(newBranding);
+
+    await persistNewFestival(newFest, {
+      nameEn,
+      nameTe,
+      openingBalanceGeneral: opGen,
+      openingBalanceYouth: opYouth,
+    });
+    if (data.isCurrent) {
+      await persistSetCurrentFestival(id);
+    }
+
+    writeAudit({
+      actorId: viewer.user!.id,
+      action: "CREATE",
+      entity: "festival",
+      recordId: id,
+      oldValue: null,
+      newValue: JSON.stringify(data),
+      reason: "Added new festival edition",
+    });
+
+    return { id, year: data.year };
+  });
+
+export const updateFestivalFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    id: z.string(),
+    year: z.number().int().min(2000).max(2100).optional(),
+    nameEn: z.string().trim().min(1).max(200).optional(),
+    nameTe: z.string().trim().max(200).optional(),
+    startDate: z.string().min(10).max(10).optional(),
+    endDate: z.string().min(10).max(10).optional(),
+    status: z.enum(["PLANNING", "ACTIVE", "FINAL_REVIEW", "CLOSED", "ARCHIVED"]).optional(),
+    isCurrent: z.boolean().optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    requireAdmin(viewer);
+    const f = db.festivals.find((x) => x.id === data.id);
+    if (!f) throw new Error("Festival not found");
+
+    const oldVal = JSON.stringify(f);
+    if (data.year !== undefined) f.year = data.year;
+    if (data.startDate !== undefined) f.startDate = data.startDate;
+    if (data.endDate !== undefined) f.endDate = data.endDate;
+    if (data.status !== undefined) f.status = data.status;
+
+    const b = db.branding.find((x) => x.festivalId === f.id);
+    if (b) {
+      if (data.nameEn) b.nameEn = data.nameEn;
+      if (data.nameTe) b.nameTe = data.nameTe;
+    }
+
+    const { writeAudit, persistUpdateFestival, persistSetCurrentFestival } = await store();
+    if (data.isCurrent) {
+      for (const item of db.festivals) {
+        item.isCurrent = item.id === f.id;
+      }
+      f.isCurrent = true;
+      await persistSetCurrentFestival(f.id);
+    }
+
+    await persistUpdateFestival(f, data.nameEn, data.nameTe);
+
+    writeAudit({
+      actorId: viewer.user!.id,
+      action: "UPDATE",
+      entity: "festival",
+      recordId: f.id,
+      oldValue: oldVal,
+      newValue: JSON.stringify(data),
+      reason: "Updated festival edition details",
+    });
+
+    return { ok: true };
+  });
+
+export const setCurrentFestivalFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string() }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    requireAdmin(viewer);
+    const f = db.festivals.find((x) => x.id === data.id);
+    if (!f) throw new Error("Festival not found");
+
+    for (const item of db.festivals) {
+      item.isCurrent = item.id === f.id;
+    }
+    const { writeAudit, persistSetCurrentFestival } = await store();
+    await persistSetCurrentFestival(f.id);
+
+    writeAudit({
+      actorId: viewer.user!.id,
+      action: "STATUS_CHANGE",
+      entity: "festival",
+      recordId: f.id,
+      oldValue: null,
+      newValue: `current=true`,
+      reason: `Set festival ${f.year} as current active edition`,
+    });
+
+    return { ok: true };
+  });
+
+export const closeFestivalFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    id: z.string(),
+    forwardToFestivalId: z.string().optional(),
+    reason: z.string().trim().optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    requireAdmin(viewer);
+    const f = db.festivals.find((x) => x.id === data.id);
+    if (!f) throw new Error("Festival not found");
+
+    f.status = "CLOSED";
+    const { writeAudit, persistCloseFestivalAndForwardBalance } = await store();
+    await persistCloseFestivalAndForwardBalance(f.id, data.forwardToFestivalId);
+
+    writeAudit({
+      actorId: viewer.user!.id,
+      action: "STATUS_CHANGE",
+      entity: "festival",
+      recordId: f.id,
+      oldValue: "ACTIVE",
+      newValue: "CLOSED",
+      reason: data.reason || "Festival closed with balance forwarding",
+    });
+
     return { ok: true };
   });
 export const announceFn = createServerFn({ method: "POST" })
@@ -328,10 +599,245 @@ export const announceFn = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const updateBrandingFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    nameEn: z.string().trim().min(1).max(200).optional(),
+    nameTe: z.string().trim().max(200).optional(),
+    taglineEn: z.string().trim().max(300).optional(),
+    taglineTe: z.string().trim().max(300).optional(),
+    siteNameEn: z.string().trim().max(100).optional(),
+    siteNameTe: z.string().trim().max(100).optional(),
+    logo: z.string().max(5_000_000).nullable().optional(),
+    openingBalanceGeneral: z.number().min(0).optional(),
+    openingBalanceYouth: z.number().min(0).optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, festival, viewer } = await ctx();
+    requireAdmin(viewer);
+    const b = db.branding.find((x) => x.festivalId === festival.id);
+    if (!b) throw new Error("Branding not found");
+    const old = JSON.stringify({
+      nameEn: b.nameEn,
+      nameTe: b.nameTe,
+      siteNameEn: b.siteNameEn,
+      siteNameTe: b.siteNameTe,
+      logo: b.logo,
+      openingBalanceGeneral: b.openingBalanceGeneral,
+      openingBalanceYouth: b.openingBalanceYouth,
+      startDate: festival.startDate,
+      endDate: festival.endDate,
+    });
+    if (data.nameEn) b.nameEn = data.nameEn;
+    if (data.nameTe) b.nameTe = data.nameTe;
+    if (data.taglineEn) b.taglineEn = data.taglineEn;
+    if (data.taglineTe) b.taglineTe = data.taglineTe;
+    if (data.siteNameEn) b.siteNameEn = data.siteNameEn;
+    if (data.siteNameTe) b.siteNameTe = data.siteNameTe;
+    if (data.logo !== undefined) b.logo = data.logo;
+    if (data.openingBalanceGeneral !== undefined) b.openingBalanceGeneral = data.openingBalanceGeneral;
+    if (data.openingBalanceYouth !== undefined) b.openingBalanceYouth = data.openingBalanceYouth;
+    if (data.startDate) festival.startDate = data.startDate;
+    if (data.endDate) festival.endDate = data.endDate;
+    const { writeAudit, persistBranding } = await store();
+    await persistBranding(festival.id, data);
+    writeAudit({ actorId: viewer.user!.id, action: "UPDATE", entity: "branding", recordId: festival.id, oldValue: old, newValue: JSON.stringify(data), reason: null });
+    return { ok: true };
+  });
+
+export const addAuctionFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    itemEn: z.string().trim().min(1).max(120),
+    itemTe: z.string().trim().max(120).optional(),
+    scope: z.enum(["GENERAL", "YOUTH"]),
+    winnerType: z.enum(["INDIVIDUAL", "GROUP"]),
+    winnerName: z.string().trim().min(1).max(120),
+    finalAmount: z.number().positive().max(10_000_000),
+    notes: z.string().trim().max(500).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, festival, viewer } = await ctx();
+    requireAdmin(viewer);
+    const { newId, writeAudit, persistAuction } = await store();
+    const id = newId("a");
+    const rec: Auction = {
+      id,
+      festivalId: festival.id,
+      itemEn: data.itemEn,
+      itemTe: data.itemTe || data.itemEn,
+      scope: data.scope,
+      auctionYear: festival.year,
+      forFestivalYear: festival.year,
+      winnerType: data.winnerType,
+      winnerName: data.winnerName,
+      finalAmount: data.finalAmount,
+      paymentStatus: "PENDING",
+      createdBy: viewer.user?.id || "admin",
+      createdAt: new Date().toISOString(),
+      status: "APPROVED",
+      deletedAt: null,
+      deleteReason: null,
+    };
+    db.auctions.push(rec);
+    await persistAuction(rec);
+    writeAudit({
+      actorId: viewer.user?.id || "admin",
+      action: "CREATE",
+      entity: "auction",
+      recordId: id,
+      oldValue: null,
+      newValue: JSON.stringify(data),
+      reason: null,
+    });
+    return { id };
+  });
+
+export const addHighlightFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    titleEn: z.string().trim().min(1).max(120),
+    titleTe: z.string().trim().max(120).optional(),
+    bodyEn: z.string().trim().min(1).max(500),
+    bodyTe: z.string().trim().max(500).optional(),
+    imageUrl: z.string().nullable().optional(),
+    enabled: z.boolean().optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, festival, viewer } = await ctx();
+    requireAdmin(viewer);
+    const { newId, writeAudit, persistHighlight } = await store();
+    const id = newId("h");
+    const highestOrder = db.highlights.filter((h) => h.festivalId === festival.id).reduce((max, h) => Math.max(max, h.order), 0);
+    const rec: Highlight = {
+      id,
+      festivalId: festival.id,
+      titleEn: data.titleEn,
+      titleTe: data.titleTe || data.titleEn,
+      bodyEn: data.bodyEn,
+      bodyTe: data.bodyTe || data.bodyEn,
+      image: data.imageUrl || null,
+      enabled: data.enabled ?? true,
+      order: highestOrder + 1,
+      relatedAuctionId: null,
+      relatedDonationId: null,
+    };
+    db.highlights.push(rec);
+    await persistHighlight(rec);
+    writeAudit({
+      actorId: viewer.user?.id || "admin",
+      action: "CREATE",
+      entity: "highlight",
+      recordId: id,
+      oldValue: null,
+      newValue: JSON.stringify(data),
+      reason: null,
+    });
+    return { id };
+  });
+
+export const addMemoryPostFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    titleEn: z.string().trim().min(1).max(120),
+    titleTe: z.string().trim().max(120).optional(),
+    body: z.string().trim().min(1).max(1000),
+    visibility: z.enum(["PUBLIC", "YOUTH", "ADMIN"]),
+    imageUrl: z.string().nullable().optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, festival, viewer } = await ctx();
+    requireAdmin(viewer);
+    const { newId, writeAudit, persistPost } = await store();
+    const id = newId("p");
+    const mediaId = newId("m");
+    const rec: MemoryPost = {
+      id,
+      festivalId: festival.id,
+      kind: "MEMORY",
+      titleEn: data.titleEn,
+      titleTe: data.titleTe || data.titleEn,
+      body: data.body,
+      visibility: data.visibility,
+      createdAt: new Date().toISOString(),
+      media: data.imageUrl ? [{
+        id: mediaId,
+        postId: id,
+        kind: "IMAGE",
+        url: data.imageUrl,
+        caption: null,
+      }] : [],
+    };
+    db.posts.push(rec);
+    await persistPost(rec);
+    writeAudit({
+      actorId: viewer.user?.id || "admin",
+      action: "CREATE",
+      entity: "memory_post",
+      recordId: id,
+      oldValue: null,
+      newValue: JSON.stringify(data),
+      reason: null,
+    });
+    return { id };
+  });
+
+export const deleteHighlightFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string() }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    requireAdmin(viewer);
+    const idx = db.highlights.findIndex((h) => h.id === data.id);
+    if (idx >= 0) db.highlights.splice(idx, 1);
+    const { sql } = await import("./db.server");
+    try {
+      await sql`UPDATE highlights SET is_active = false, updated_at = NOW() WHERE id = ${data.id}`;
+    } catch (e) {
+      console.error(e);
+    }
+    return { ok: true };
+  });
+
+export const deletePostFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string() }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    requireAdmin(viewer);
+    const idx = db.posts.findIndex((p) => p.id === data.id);
+    if (idx >= 0) db.posts.splice(idx, 1);
+    const { sql } = await import("./db.server");
+    try {
+      await sql`UPDATE memory_posts SET is_active = false, updated_at = NOW() WHERE id = ${data.id}`;
+    } catch (e) {
+      console.error(e);
+    }
+    return { ok: true };
+  });
+
+export const deleteAuctionFn = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string() }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, viewer } = await ctx();
+    requireAdmin(viewer);
+    const a = db.auctions.find((x) => x.id === data.id);
+    if (a) {
+      a.deletedAt = new Date().toISOString();
+      a.deleteReason = "Deleted by admin";
+    }
+    const { sql } = await import("./db.server");
+    try {
+      await sql`UPDATE auctions SET is_public = false, updated_at = NOW() WHERE id = ${data.id}`;
+    } catch (e) {
+      console.error(e);
+    }
+    return { ok: true };
+  });
+
 // ---------- Detail views (visibility enforced) ----------
 const idInput = z.object({ id: z.string().min(1).max(60) });
 const audience = (db: Awaited<ReturnType<typeof store>>["db"], recordId: string) =>
-  db.audit.filter((a) => a.recordId === recordId).map((a) => ({ ...a, actor: db.users.find((u) => u.id === a.actorId)?.name ?? a.actorId }));
+  db.audit.filter((a) => a.recordId === recordId).map((a) => {
+    const u = db.users.find((u) => u.id === a.actorId);
+    return { ...a, actor: u?.role === "ADMIN" ? "Admin" : (u?.name ?? a.actorId) };
+  });
 
 export const getDonationFn = createServerFn({ method: "GET" })
   .inputValidator((d) => idInput.parse(d))
@@ -390,13 +896,23 @@ export const getYouthFn = createServerFn({ method: "GET" }).handler(async () => 
   const donations = live(db.donations.filter((d) => d.festivalId === fid));
   const expenses = live(db.expenses.filter((e) => e.festivalId === fid));
   const auctions = live(db.auctions.filter((a) => a.festivalId === fid));
-  const s = financialSummary(donations, expenses, auctions, db.contributions);
+  const branding = db.branding.find((b) => b.festivalId === fid);
+  const s = financialSummary(donations, expenses, auctions, db.contributions, {
+    general: branding?.openingBalanceGeneral ?? 0,
+    youth: branding?.openingBalanceYouth ?? 0,
+  });
   return {
-    denied: false as const, festival, youth: s.youth, general: s.general,
+    denied: false as const, festival, viewer, youth: s.youth, general: s.general,
     youthDonations: donations.filter((d) => d.youthAmount > 0).sort((a, b) => b.date.localeCompare(a.date)),
     youthExpenses: expenses.filter((e) => e.scope === "YOUTH"),
     categories: db.categories,
     members: db.memberships.filter((m) => m.festivalId === fid && m.youth).map((m) => ({ ...m, name: db.users.find((u) => u.id === m.userId)?.name ?? m.userId })),
+    allUsers: viewer.isAdmin ? db.users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      role: u.role,
+      isYouth: db.userPermissions.some((p) => p.userId === u.id && p.permission === "YOUTH_ACCESS"),
+    })) : null,
     combined: { donations: s.general.donations + s.youth.donations, collected: s.general.auctionCollected + s.youth.auctionCollected, expenses: s.general.expenses + s.youth.expenses, balance: s.general.balance + s.youth.balance },
     youthAuctions: auctions.filter((a) => a.scope === "YOUTH").map((a) => ({
       id: a.id, itemEn: a.itemEn, itemTe: a.itemTe, winnerName: a.winnerName, finalAmount: a.finalAmount,
@@ -407,7 +923,10 @@ export const getYouthFn = createServerFn({ method: "GET" }).handler(async () => 
     youthLogs: db.audit.filter((l) => {
       const ids = new Set([...donations.filter((d) => d.youthAmount > 0).map((d) => d.id), ...expenses.filter((e) => e.scope === "YOUTH").map((e) => e.id), ...auctions.filter((a) => a.scope === "YOUTH").map((a) => a.id)]);
       return ids.has(l.recordId);
-    }).slice(0, 20).map((l) => ({ id: l.id, action: l.action, entity: l.entity, reason: l.reason, at: l.at, actor: db.users.find((u) => u.id === l.actorId)?.name ?? l.actorId })),
+    }).slice(0, 20).map((l) => {
+      const u = db.users.find((u) => u.id === l.actorId);
+      return { id: l.id, action: l.action, entity: l.entity, reason: l.reason, at: l.at, actor: u?.role === "ADMIN" ? "Admin" : (u?.name ?? l.actorId) };
+    }),
   };
 });
 
@@ -416,9 +935,10 @@ export const getAdminDataFn = createServerFn({ method: "GET" }).handler(async ()
   const { db, festival, viewer } = await ctx();
   if (!viewer.isAdmin) return { denied: true as const };
   const fid = festival.id;
+  const branding = db.branding.find((b) => b.festivalId === fid) ?? db.branding[0] ?? defaultBranding;
   return {
     denied: false as const, festival,
-    branding: db.branding.find((b) => b.festivalId === fid)!,
+    branding,
     donations: db.donations.filter((d) => d.festivalId === fid).sort((a, b) => b.date.localeCompare(a.date)),
     expenses: db.expenses.filter((e) => e.festivalId === fid).sort((a, b) => b.date.localeCompare(a.date)),
     categories: db.categories,
@@ -429,7 +949,13 @@ export const getAdminDataFn = createServerFn({ method: "GET" }).handler(async ()
     })),
     posts: db.posts.filter((p) => p.festivalId === fid),
     sentNotifications: db.notifications.filter((n) => n.kind === "ANNOUNCEMENT").length,
-    summary: financialSummary(db.donations.filter((d) => d.festivalId === fid), db.expenses.filter((e) => e.festivalId === fid), db.auctions.filter((a) => a.festivalId === fid), db.contributions),
+    summary: financialSummary(
+      db.donations.filter((d) => d.festivalId === fid),
+      db.expenses.filter((e) => e.festivalId === fid),
+      db.auctions.filter((a) => a.festivalId === fid),
+      db.contributions,
+      { general: branding?.openingBalanceGeneral ?? 0, youth: branding?.openingBalanceYouth ?? 0 }
+    ),
   };
 });
 
@@ -441,14 +967,25 @@ export const setPermissionFn = createServerFn({ method: "POST" })
     const { PERMISSIONS } = await import("@/domain/types");
     const perm = PERMISSIONS.find((p) => p === data.permission);
     if (!perm) throw new Error("Unknown permission");
-    const i = db.userPermissions.findIndex((p) => p.userId === data.userId && p.permission === perm && p.festivalId === festival.id);
-    if (data.enabled && i < 0) db.userPermissions.push({ userId: data.userId, permission: perm, festivalId: festival.id });
-    if (!data.enabled && i >= 0) db.userPermissions.splice(i, 1);
+    // Remove any existing entry for this user and permission
+    db.userPermissions = db.userPermissions.filter(
+      (p) => !(p.userId === data.userId && p.permission === perm)
+    );
+    if (data.enabled) {
+      db.userPermissions.push({ userId: data.userId, permission: perm, festivalId: null });
+    }
+
     if (perm === "YOUTH_ACCESS") {
       const m = db.memberships.find((x) => x.userId === data.userId && x.festivalId === festival.id);
-      if (m) { m.youth = data.enabled; m.approved = data.enabled; } else if (data.enabled) db.memberships.push({ userId: data.userId, festivalId: festival.id, youth: true, approved: true });
+      if (m) {
+        m.youth = data.enabled;
+        m.approved = data.enabled;
+      } else if (data.enabled) {
+        db.memberships.push({ userId: data.userId, festivalId: festival.id, youth: true, approved: true });
+      }
     }
-    const { writeAudit } = await store();
+    const { writeAudit, persistPermission } = await store();
+    await persistPermission(data.userId, perm, festival.id, data.enabled);
     writeAudit({ actorId: viewer.user!.id, action: "UPDATE", entity: "user_permission", recordId: data.userId, oldValue: null, newValue: `${perm}=${data.enabled}`, reason: null });
     return { ok: true };
   });
@@ -475,7 +1012,8 @@ export const approveRecordFn = createServerFn({ method: "POST" })
     const d = db.donations.find((x) => x.id === data.id);
     if (!d) throw new Error("Not found");
     d.status = "APPROVED";
-    const { writeAudit } = await store();
+    const { writeAudit, persistApproval } = await store();
+    await persistApproval(d.id);
     writeAudit({ actorId: viewer.user!.id, action: "APPROVE", entity: "donation", recordId: d.id, oldValue: "PENDING_APPROVAL", newValue: "APPROVED", reason: null });
     return { ok: true };
   });
@@ -496,7 +1034,9 @@ export const exportReportFn = createServerFn({ method: "GET" })
 
 // ---------- Edits (audited; old + new values recorded) ----------
 const donationFields = z.object({
-  donorName: z.string().trim().min(1).max(120), village: z.string().trim().max(80).nullable(),
+  donorName: z.string().trim().min(1).max(120),
+  donorNameTe: z.string().trim().max(120).nullable().optional(),
+  village: z.string().trim().max(80).nullable(),
   scope: z.enum(["GENERAL", "YOUTH", "BOTH"]), totalAmount: z.number().positive().max(10_000_000),
   generalAmount: z.number().min(0), youthAmount: z.number().min(0), method, date: z.string().min(10).max(10),
 });
@@ -516,7 +1056,8 @@ export const updateDonationFn = createServerFn({ method: "POST" })
     if (err) throw new Error(err);
     const old = JSON.stringify(d);
     Object.assign(d, fields);
-    const { writeAudit } = await store();
+    const { writeAudit, persistDonation } = await store();
+    await persistDonation(d);
     writeAudit({ actorId: viewer.user!.id, action: "UPDATE", entity: "donation", recordId: id, oldValue: old, newValue: JSON.stringify(fields), reason });
     return { ok: true };
   });
@@ -539,7 +1080,8 @@ export const updateExpenseFn = createServerFn({ method: "POST" })
     const { id, reason, ...fields } = data;
     const old = JSON.stringify(e);
     Object.assign(e, fields);
-    const { writeAudit } = await store();
+    const { writeAudit, persistExpense } = await store();
+    await persistExpense(e);
     writeAudit({ actorId: viewer.user!.id, action: "UPDATE", entity: "expense", recordId: id, oldValue: old, newValue: JSON.stringify(fields), reason });
     return { ok: true };
   });

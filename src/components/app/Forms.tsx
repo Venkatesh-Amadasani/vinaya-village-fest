@@ -43,8 +43,8 @@ export function DonationForm({ canYouth, edit }: { canYouth: boolean; edit?: Don
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
   const [f, setF] = useState(edit
-    ? { donorName: edit.donorName, village: edit.village ?? "", scope: edit.scope, total: String(edit.totalAmount), general: String(edit.generalAmount), youth: String(edit.youthAmount), method: edit.method, date: edit.date.slice(0, 10) }
-    : { donorName: "", village: "", scope: "GENERAL" as DonationScope, total: "", general: "", youth: "", method: "CASH" as PaymentMethod, date: today() });
+    ? { donorName: edit.donorName, donorNameTe: edit.donorNameTe ?? "", village: edit.village ?? "", scope: edit.scope, total: String(edit.totalAmount), general: String(edit.generalAmount), youth: String(edit.youthAmount), method: edit.method, date: edit.date.slice(0, 10) }
+    : { donorName: "", donorNameTe: "", village: "", scope: "GENERAL" as DonationScope, total: "", general: "", youth: "", method: "CASH" as PaymentMethod, date: today() });
   const total = Number(f.total) || 0;
   const generalAmount = f.scope === "GENERAL" ? total : f.scope === "YOUTH" ? 0 : Number(f.general) || 0;
   const youthAmount = f.scope === "YOUTH" ? total : f.scope === "GENERAL" ? 0 : Number(f.youth) || 0;
@@ -54,7 +54,7 @@ export function DonationForm({ canYouth, edit }: { canYouth: boolean; edit?: Don
     if (splitError || !f.donorName.trim()) return;
     setBusy(true);
     try {
-      const payload = { donorName: f.donorName, village: f.village.trim() || null, scope: f.scope, totalAmount: total, generalAmount, youthAmount, method: f.method, date: f.date };
+      const payload = { donorName: f.donorName.trim(), donorNameTe: f.donorNameTe.trim() || null, village: f.village.trim() || null, scope: f.scope, totalAmount: total, generalAmount, youthAmount, method: f.method, date: f.date };
       if (edit) await updateDonationFn({ data: { ...payload, id: edit.id, reason } });
       else await addDonationFn({ data: payload });
       toast.success(edit ? "Donation updated" : "Donation recorded");
@@ -64,7 +64,14 @@ export function DonationForm({ canYouth, edit }: { canYouth: boolean; edit?: Don
   return (
     <FormDialog trigger={edit ? t("edit") : t("addDonation")} title={edit ? t("edit") : t("addDonation")} open={open} setOpen={setOpen} outline={!!edit}>
       <form onSubmit={submit} className="space-y-4">
-        <Field label={t("donor")}><Input required maxLength={120} value={f.donorName} onChange={(e) => setF({ ...f, donorName: e.target.value })} /></Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={`${t("donor")} (English)`}>
+            <Input required maxLength={120} value={f.donorName} onChange={(e) => setF({ ...f, donorName: e.target.value })} placeholder="e.g. Suresh Reddy" />
+          </Field>
+          <Field label={`${t("donor")} (తెలుగు)`}>
+            <Input maxLength={120} value={f.donorNameTe} onChange={(e) => setF({ ...f, donorNameTe: e.target.value })} placeholder="ఉదా: సురేష్ రెడ్డి" />
+          </Field>
+        </div>
         <Field label={t("village")}><Input maxLength={80} value={f.village} onChange={(e) => setF({ ...f, village: e.target.value })} /></Field>
         {canYouth && (
           <Field label={t("split")}>
