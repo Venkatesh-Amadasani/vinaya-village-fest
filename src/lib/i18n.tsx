@@ -30,7 +30,7 @@ const dict = {
   preferences: ["Preferences", "ప్రాధాన్యతలు"], youthFund: ["Youth fund", "యువత నిధి"], combined: ["Combined", "కలిపి"],
   expenseByCategory: ["Where the money went", "డబ్బు ఎక్కడ ఖర్చైంది"], prev: ["Previous", "మునుపటి"], next: ["Next", "తర్వాత"],
   showing: ["Showing", "చూపిస్తోంది"], of: ["of", "లో"], status: ["Status", "స్థితి"], current: ["Current", "ప్రస్తుత"],
-  demoNotice: ["Connected to Supabase PostgreSQL — Records and financial audits are persisted live.", "సుపాబేస్ డేటాబేస్‌తో అనుసంధానించబడింది — రికార్డులు నేరుగా సేవ్ అవుతాయి."],
+  demoNotice: ["Vinayaka Chavithi Village Portal — Live Records & Financial Transparency", "వినాయక చవితి గ్రామ వేదిక — ప్రత్యక్ష రికార్డులు & ఆర్థిక పారదర్శకత"],
   receipt: ["Receipt", "రసీదు"], printReceipt: ["Print Receipt", "రసీదు ముద్రించండి"],
   PLANNING: ["Planning", "ప్రణాళిక"], ACTIVE: ["Active", "జరుగుతోంది"], FINAL_REVIEW: ["Final review", "తుది సమీక్ష"],
   CLOSED: ["Closed", "ముగిసింది"], ARCHIVED: ["Archived", "భద్రపరచబడింది"],

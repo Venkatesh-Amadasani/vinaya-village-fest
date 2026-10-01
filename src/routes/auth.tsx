@@ -7,7 +7,7 @@ import { PageSkeleton, Pill, SectionHeader } from "@/components/app/bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { loginUserFn, registerUserFn, logoutUserFn, setDemoUserFn } from "@/lib/api.functions";
+import { loginUserFn, registerUserFn, logoutUserFn } from "@/lib/api.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/auth")({
@@ -23,14 +23,13 @@ export const Route = createFileRoute("/auth")({
 });
 
 function Page() {
-  const { t, lang } = useI18n();
+  const { lang } = useI18n();
   const qc = useQueryClient();
   const { data } = useQuery(sessionQ());
   const nav = useNavigate();
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [busy, setBusy] = useState(false);
-  const [showDemo, setShowDemo] = useState(false);
 
   // Sign in form state
   const [identifier, setIdentifier] = useState("");
@@ -72,7 +71,7 @@ function Page() {
         toast.error(
           lang === "te"
             ? "వినియోగదారు కనుగొనబడలేదు. ఫోన్ నంబర్ సరిచూసుకోండి లేదా కొత్తగా నమోదు చేసుకోండి."
-            : "User not found. Please check phone number or register a new account."
+            : "User not found. Please check mobile number or register a new account."
         );
       } else if (msg.includes("INVALID_PASSWORD")) {
         toast.error(
@@ -160,32 +159,14 @@ function Page() {
     }
   };
 
-  const handleQuickDemo = async (userId: string, demoPassword: string, name: string) => {
-    setBusy(true);
-    try {
-      await setDemoUserFn({ data: { userId } });
-      await qc.invalidateQueries();
-      toast.success(
-        lang === "te"
-          ? `${name} గా లాగిన్ అయ్యారు`
-          : `Signed in as ${name}`
-      );
-      await nav({ to: "/" });
-    } catch (err: any) {
-      toast.error(err?.message || "Demo sign in failed");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <SectionHeader
-        title={lang === "te" ? "ఖాతా ప్రామాణీకరణ & ప్రవేశం" : "Account Access & Registration"}
+        title={lang === "te" ? "ఖాతా ప్రవేశం & నమోదు" : "Sign In & Registration"}
         sub={
           lang === "te"
-            ? "గ్రామ వినాయక చవితి ఉత్సవ వేదికలోకి ప్రవేశించండి లేదా కొత్త ఖాతా సృష్టించండి."
-            : "Sign in to access your devotee / committee portal or register a new account."
+            ? "గ్రామ వినాయక చవితి వేదికలోకి ప్రవేశించండి లేదా కొత్త ఖాతా సృష్టించండి."
+            : "Sign in to access your account or register as a new village devotee."
         }
       />
 
@@ -203,8 +184,8 @@ function Page() {
                   {current.role === "ADMIN"
                     ? (lang === "te" ? "నిర్వాహకులు" : "Admin")
                     : data.viewer.canSeeYouth
-                    ? (lang === "te" ? "యువత సభ్యుడు" : "Youth Member")
-                    : (lang === "te" ? "సాధారణ భక్తుడు" : "Devotee")}
+                    ? (lang === "te" ? "యువత సభ్యులు" : "Youth Member")
+                    : (lang === "te" ? "భక్తులు" : "Devotee")}
                 </Pill>
               </h4>
               <p className="text-xs text-muted-foreground mt-0.5">{current.phone}</p>
@@ -253,7 +234,7 @@ function Page() {
               : "text-muted-foreground hover:text-foreground"
           )}
         >
-          {lang === "te" ? "లాగిన్ (ప్రవేశం)" : "Sign In"}
+          {lang === "te" ? "లాగిన్" : "Sign In"}
         </button>
         <button
           type="button"
@@ -265,7 +246,7 @@ function Page() {
               : "text-muted-foreground hover:text-foreground"
           )}
         >
-          {lang === "te" ? "కొత్త ఖాతా (నమోదు)" : "New Registration"}
+          {lang === "te" ? "కొత్త నమోదు" : "New Registration"}
         </button>
       </div>
 
@@ -274,7 +255,7 @@ function Page() {
         <form onSubmit={handleSignIn} className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div>
             <h3 className="text-base font-bold">
-              {lang === "te" ? "ఖాతాలోకి ప్రవేశించండి" : "Sign in with Credentials"}
+              {lang === "te" ? "ఖాతాలోకి ప్రవేశించండి" : "Sign In"}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
               {lang === "te"
@@ -285,12 +266,12 @@ function Page() {
 
           <div>
             <label className="text-xs font-semibold block mb-1">
-              {lang === "te" ? "మొబైల్ నంబర్ లేదా యూజర్‌నేమ్" : "Mobile Number / Username"}
+              {lang === "te" ? "మొబైల్ నంబర్ లేదా ఖాతా పేరు" : "Mobile Number / Username"}
             </label>
             <Input
               type="text"
               required
-              placeholder={lang === "te" ? "ఉదా: 9000000002" : "e.g. 9000000002 or 9999999999"}
+              placeholder={lang === "te" ? "ఉదా: 9876543210" : "e.g. 9876543210"}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="h-10"
@@ -348,12 +329,12 @@ function Page() {
         <form onSubmit={handleSignUp} className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div>
             <h3 className="text-base font-bold">
-              {lang === "te" ? "కొత్త భక్తుడి నమోదు" : "Register New Devotee Account"}
+              {lang === "te" ? "కొత్త ఖాతా నమోదు" : "Register New Account"}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
               {lang === "te"
                 ? "మీ వివరాలు నమోదు చేసుకొని ఉత్సవ వేదికలో భాగస్వామ్యం అవ్వండి."
-                : "Create your account to view financial records, participate in auctions, and engage."}
+                : "Create your account to view festival records, participate in auctions, and engage."}
             </p>
           </div>
 
@@ -417,7 +398,7 @@ function Page() {
             </div>
             <div>
               <label className="text-xs font-semibold block mb-1">
-                {lang === "te" ? "ప్రాధాన్య భాష" : "Preferred Language"}
+                {lang === "te" ? "భాష" : "Preferred Language"}
               </label>
               <select
                 className="w-full h-10 rounded-md border bg-background px-3 text-sm"
@@ -425,7 +406,7 @@ function Page() {
                 onChange={(e) => setPrefLang(e.target.value as "en" | "te")}
               >
                 <option value="en">English</option>
-                <option value="te">తెలుగు (Telugu)</option>
+                <option value="te">తెలుగు</option>
               </select>
             </div>
           </div>
@@ -449,96 +430,13 @@ function Page() {
         </form>
       )}
 
-      {/* QUICK COMMITTEE / DEMO ACCOUNTS HELPER */}
-      <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              {lang === "te" ? "కమిటీ & డెమో ఖాతాల వివరాలు" : "Committee & Demo Logins"}
-            </h4>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {lang === "te"
-                ? "కమిటీ మరియు నిర్వాహకుల అధికారిక లాగిన్ సమాచారం:"
-                : "Credentials for official committee and admin roles:"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowDemo(!showDemo)}
-            className="text-xs text-primary font-semibold hover:underline"
-          >
-            {showDemo
-              ? (lang === "te" ? "దాచు" : "Hide")
-              : (lang === "te" ? "ఖాతాలు చూడండి" : "View Accounts")}
-          </button>
-        </div>
-
-        {showDemo && (
-          <div className="space-y-2 pt-2 border-t text-xs">
-            {/* Admin */}
-            <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
-              <div>
-                <div className="font-bold flex items-center gap-1.5">
-                  <span>{lang === "te" ? "నిర్వాహకులు (Admin)" : "Admin"}</span>
-                  <Pill tone="primary">ADMIN</Pill>
-                </div>
-                <div className="text-muted-foreground mt-0.5 font-mono text-[11px]">
-                  Phone: 9999999999 · Password: <b className="text-foreground">admin123</b>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => handleQuickDemo("74400a08-12ef-48d6-9be4-da5022b333b1", "admin123", "Admin")}
-              >
-                {lang === "te" ? "త్వరిత లాగిన్" : "Quick Login"}
-              </Button>
-            </div>
-
-            {/* Youth Member */}
-            <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
-              <div>
-                <div className="font-bold flex items-center gap-1.5">
-                  <span>Ravi Kumar</span>
-                  <Pill tone="youth">{lang === "te" ? "యువత సభ్యుడు" : "Youth Member"}</Pill>
-                </div>
-                <div className="text-muted-foreground mt-0.5 font-mono text-[11px]">
-                  Phone: 9000000002 · Password: <b className="text-foreground">youth123</b>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => handleQuickDemo("64ce6798-b1b7-4a45-aa2f-9e7956802ea7", "youth123", "Ravi Kumar")}
-              >
-                {lang === "te" ? "త్వరిత లాగిన్" : "Quick Login"}
-              </Button>
-            </div>
-
-            {/* Devotee */}
-            <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
-              <div>
-                <div className="font-bold flex items-center gap-1.5">
-                  <span>Lakshmi Devi</span>
-                  <Pill tone="muted">{lang === "te" ? "సాధారణ భక్తుడు" : "Devotee"}</Pill>
-                </div>
-                <div className="text-muted-foreground mt-0.5 font-mono text-[11px]">
-                  Phone: 9000000003 · Password: <b className="text-foreground">user123</b>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => handleQuickDemo("0819d743-52f5-48f1-9a32-e659686df531", "user123", "Lakshmi Devi")}
-              >
-                {lang === "te" ? "త్వరిత లాగిన్" : "Quick Login"}
-              </Button>
-            </div>
-          </div>
-        )}
+      {/* CONFIDENTIALITY AND SECURITY NOTICE */}
+      <div className="rounded-xl border bg-muted/20 p-4 text-center text-xs text-muted-foreground">
+        <p>
+          {lang === "te"
+            ? "🔒 మీ లాగిన్ సమాచారం మరియు పాస్‌వర్డ్ పూర్తిగా గోప్యంగా మరియు సురక్షితంగా భద్రపరచబడతాయి."
+            : "🔒 Your login credentials and passwords are encrypted and strictly confidential."}
+        </p>
       </div>
     </div>
   );
