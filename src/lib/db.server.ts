@@ -8,4 +8,12 @@ declare global {
   var __db: postgres.Sql | undefined;
 }
 
-export const sql = global.__db || (global.__db = postgres(connectionString, { ssl: "require", max: 5 }));
+export const sql =
+  global.__db ||
+  (global.__db = postgres(connectionString, {
+    ssl: "require",
+    max: 1,
+    idle_timeout: 5,
+    connect_timeout: 3,
+    prepare: false,
+  }));

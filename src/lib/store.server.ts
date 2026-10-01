@@ -8,11 +8,41 @@ import type {
   User, UserPermission,
 } from "@/domain/types";
 
-let festivals: Festival[] = [];
-let branding: FestivalBranding[] = [];
-let users: User[] = [];
-let userPermissions: UserPermission[] = [];
-let memberships: FestivalMembership[] = [];
+let festivals: Festival[] = [
+  { id: "fest-2026", year: 2026, status: "ACTIVE", startDate: "2026-09-14", endDate: "2026-09-24", isCurrent: true },
+  { id: "fest-2025", year: 2025, status: "CLOSED", startDate: "2025-08-27", endDate: "2025-09-06", isCurrent: false },
+  { id: "fest-2024", year: 2024, status: "CLOSED", startDate: "2024-09-07", endDate: "2024-09-17", isCurrent: false },
+];
+let branding: FestivalBranding[] = [
+  {
+    festivalId: "fest-2026",
+    nameEn: "Sri Vinayaka Chavithi 2026",
+    nameTe: "శ్రీ వినాయక చవితి 2026",
+    taglineEn: "Every rupee accounted, every devotee welcome",
+    taglineTe: "ప్రతి రూపాయి లెక్క, ప్రతి భక్తుడికి స్వాగతం",
+    siteNameEn: "Chinnagollapalli Vinayaka Chavithi",
+    siteNameTe: "చిన్నగొల్లపల్లి వినాయక చవితి",
+    idolImage: null,
+    bannerImage: null,
+    logo: null,
+    accentHue: 45,
+    openingBalanceGeneral: 0,
+    openingBalanceYouth: 0,
+  }
+];
+let users: User[] = [
+  { id: "74400a08-12ef-48d6-9be4-da5022b333b1", name: "Admin", phone: "9999999999", role: "ADMIN", village: "Chinnagollapalli", preferredLanguage: "en", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "64ce6798-b1b7-4a45-aa2f-9e7956802ea7", name: "Ravi Kumar", phone: "9000000002", role: "GENERAL", village: "Chinnagollapalli", preferredLanguage: "te", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "0819d743-52f5-48f1-9a32-e659686df531", name: "Lakshmi Devi", phone: "9000000003", role: "GENERAL", village: "Chinnagollapalli", preferredLanguage: "te", createdAt: "2026-01-01T00:00:00.000Z" },
+];
+let userPermissions: UserPermission[] = [
+  { userId: "64ce6798-b1b7-4a45-aa2f-9e7956802ea7", permission: "YOUTH_ACCESS", festivalId: null },
+  { userId: "64ce6798-b1b7-4a45-aa2f-9e7956802ea7", permission: "VIEW_YOUTH_DATA", festivalId: null },
+  { userId: "64ce6798-b1b7-4a45-aa2f-9e7956802ea7", permission: "VIEW_COMBINED_DATA", festivalId: null },
+];
+let memberships: FestivalMembership[] = [
+  { userId: "64ce6798-b1b7-4a45-aa2f-9e7956802ea7", festivalId: "fest-2026", youth: true, approved: true },
+];
 let categories: ExpenseCategory[] = [];
 let donations: Donation[] = [];
 let expenses: Expense[] = [];
@@ -279,15 +309,15 @@ export async function syncFromDb(): Promise<void> {
 export async function ensureDb(): Promise<typeof db> {
   if (!hasLoaded) {
     if (!loadPromise) {
-      loadPromise = syncFromDb();
+      loadPromise = Promise.race([
+        syncFromDb(),
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
     }
     await loadPromise;
   }
   return db;
 }
-
-// Initial sync on module load
-syncFromDb().catch(() => {});
 
 // ---------- Persistence Actions directly to Supabase ----------
 
