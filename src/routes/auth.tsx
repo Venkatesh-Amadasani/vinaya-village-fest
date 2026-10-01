@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { sessionQ } from "@/lib/queries";
@@ -27,6 +27,7 @@ function Page() {
   const qc = useQueryClient();
   const { data } = useQuery(sessionQ());
   const nav = useNavigate();
+  const router = useRouter();
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [busy, setBusy] = useState(false);
@@ -70,7 +71,8 @@ function Page() {
           ? `స్వాగతం ${displayName}! విజయవంతంగా లాగిన్ అయ్యారు.`
           : `Welcome ${displayName}! Signed in successfully.`
       );
-      await nav({ to: isAdmin ? "/admin" : "/" });
+      // Force full page reload to ensure server reads the new cookie
+      window.location.href = isAdmin ? "/admin" : "/";
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg.includes("USER_NOT_FOUND")) {
@@ -139,7 +141,8 @@ function Page() {
           ? `నమోదు విజయవంతమైంది! స్వాగతం ${displayName}.`
           : `Registration successful! Welcome ${displayName}.`
       );
-      await nav({ to: "/" });
+      // Force full page reload to ensure server reads the new cookie
+      window.location.href = "/";
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg.includes("PHONE_ALREADY_EXISTS")) {
@@ -168,7 +171,8 @@ function Page() {
       await logoutUserFn();
       await qc.invalidateQueries();
       toast.success(lang === "te" ? "లాగౌట్ అయ్యారు" : "Signed out successfully");
-      await nav({ to: "/" });
+      // Force full page reload to ensure cookie is cleared
+      window.location.href = "/";
     } finally {
       setBusy(false);
     }
