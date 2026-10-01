@@ -60,12 +60,13 @@ function Page() {
       });
       await qc.invalidateQueries();
       const displayName = res?.user?.name || identifier.trim();
+      const isAdmin = res?.user?.role === "ADMIN";
       toast.success(
         lang === "te"
           ? `స్వాగతం ${displayName}! విజయవంతంగా లాగిన్ అయ్యారు.`
           : `Welcome ${displayName}! Signed in successfully.`
       );
-      await nav({ to: "/" });
+      await nav({ to: isAdmin ? "/admin" : "/" });
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg.includes("USER_NOT_FOUND")) {
