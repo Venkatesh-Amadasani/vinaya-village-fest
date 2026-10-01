@@ -2,8 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { sessionQ, overviewQ, youthQ } from "@/lib/queries";
 import { useI18n } from "@/lib/i18n";
-import { FundCards, KpiCard } from "@/components/app/Finance";
-import { PageSkeleton, Pill, SectionHeader } from "@/components/app/bits";
+import { FundCards } from "@/components/app/Finance";
+import { KpiCard, PageSkeleton, Pill, SectionHeader } from "@/components/app/bits";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "My Dashboard — Vinayaka Chavithi" }, { name: "description", content: "Your festival role, permissions and shortcuts." }, { property: "og:title", content: "My Dashboard" }, { property: "og:description", content: "Signed-in member dashboard." }] }),
