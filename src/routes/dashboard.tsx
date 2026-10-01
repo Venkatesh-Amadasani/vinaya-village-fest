@@ -33,20 +33,22 @@ function Page() {
     <div className="space-y-8">
       <SectionHeader title={`${t("myDashboard")} · ${v.user.name}`} sub={v.isAdmin ? t("admin") : v.canSeeYouth ? t("youth") : t("general")} />
       <div className="rounded-lg border border-dashed bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
-        {t("demoBadge")}: demo sign-in only — real accounts and permanent storage are not connected yet.
+        {t("demoBadge")}: {t("demoSignInNote")}
       </div>
       <section className="flex flex-wrap gap-2">
         {v.isAdmin ? <Pill tone="primary">ADMIN — all permissions</Pill> : v.permissions.length === 0 ? <Pill>View only</Pill> : v.permissions.map((p) => <Pill key={p}>{p}</Pill>)}
       </section>
       <section><SectionHeader title={t("transparency")} /><FundCards fund={overview.data.general} /></section>
-      {youth.data && !youth.data.denied && (
-        <section><SectionHeader title="Combined (General + Youth)" />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <KpiCard label={t("donations")} value={youth.data.combined.donations} /><KpiCard label="Auction collected" value={youth.data.combined.collected} />
-            <KpiCard label={t("expenses")} value={youth.data.combined.expenses} /><KpiCard label="Balance" value={youth.data.combined.balance} tone="primary" />
-          </div>
-        </section>
-      )}
+      {youth.data && !youth.data.denied && (() => {
+        const g = youth.data.general, y = youth.data.youth;
+        const sum = { donations: g.donations + y.donations, auctionCollected: g.auctionCollected + y.auctionCollected, auctionCommitted: g.auctionCommitted + y.auctionCommitted, expenses: g.expenses + y.expenses, balance: g.balance + y.balance };
+        return (<>
+          <section><SectionHeader title={t("youthFund")} /><FundCards fund={y} youth /></section>
+          <section><SectionHeader title={t("combinedFund")} /><FundCards fund={{ ...g, ...sum }} />
+            <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4"><KpiCard label={t("auctionOutstanding")} value={Math.max(0, sum.auctionCommitted - sum.auctionCollected)} /></div>
+          </section>
+        </>);
+      })()}
       <nav className="grid gap-3 sm:grid-cols-3">
         {links.map((l) => <Link key={l.to} to={l.to} className="rounded-xl border bg-card p-4 font-semibold shadow-card hover:bg-muted">{l.label}</Link>)}
       </nav>
