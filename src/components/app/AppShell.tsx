@@ -82,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   onClick={async () => {
                     await logout(null);
                     toast.success(lang === "te" ? "విజయవంతంగా లాగ్ అవుట్ అయ్యారు" : "Logged out successfully");
-                    await router.navigate({ to: "/" });
+                    window.location.href = "/";
                   }}
                   className="flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all shadow-xs"
                   title={lang === "te" ? "లాగ్ అవుట్" : "Logout"}
@@ -115,14 +115,18 @@ export function useSwitchUser() {
   const qc = useQueryClient();
   const router = useRouter();
   return async (userId: string | null) => {
-    if (typeof document !== "undefined") {
+    if (typeof window !== "undefined") {
       if (userId) {
+        try { window.localStorage.setItem("vvc_demo_uid", userId); } catch {}
         document.cookie = `vvc_demo_uid=${userId}; path=/; max-age=31536000; SameSite=Lax`;
       } else {
+        try { window.localStorage.removeItem("vvc_demo_uid"); } catch {}
         document.cookie = `vvc_demo_uid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
       }
     }
-    await setDemoUserFn({ data: { userId } });
+    try {
+      await setDemoUserFn({ data: { userId } });
+    } catch {}
     await qc.invalidateQueries();
     await router.invalidate();
   };

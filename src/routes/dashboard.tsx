@@ -43,7 +43,7 @@ function Page() {
           onClick={async () => {
             await logout(null);
             toast.success(lang === "te" ? "విజయవంతంగా లాగ్ అవుట్ అయ్యారు" : "Logged out successfully");
-            await router.navigate({ to: "/" });
+            window.location.href = "/";
           }}
           className="inline-flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
         >

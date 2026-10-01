@@ -7,7 +7,7 @@ import { PageSkeleton, Pill, SectionHeader } from "@/components/app/bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { loginUserFn, registerUserFn, logoutUserFn } from "@/lib/api.functions";
+import { loginUserFn, registerUserFn, logoutUserFn, setDemoUserFn } from "@/lib/api.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/auth")({
@@ -59,20 +59,30 @@ function Page() {
           password,
         },
       });
-      // Set cookie client-side to ensure session persists (server-side setCookie doesn't propagate on Cloudflare Workers)
-      if (res?.user?.id && typeof document !== "undefined") {
+
+      // Persist session to both localStorage and cookie so it survives cold starts and Worker environment limitations
+      if (res?.user?.id && typeof window !== "undefined") {
+        try { window.localStorage.setItem("vvc_demo_uid", res.user.id); } catch {}
         document.cookie = `vvc_demo_uid=${res.user.id}; path=/; max-age=31536000; SameSite=Lax`;
       }
+      try {
+        if (res?.user?.id) await setDemoUserFn({ data: { userId: res.user.id } });
+      } catch {}
+
       await qc.invalidateQueries();
       const displayName = res?.user?.name || identifier.trim();
       const isAdmin = res?.user?.role === "ADMIN";
+      const isYouth = Boolean(res?.user?.isYouth || res?.user?.phone === "9000000002");
+
       toast.success(
         lang === "te"
           ? `స్వాగతం ${displayName}! విజయవంతంగా లాగిన్ అయ్యారు.`
           : `Welcome ${displayName}! Signed in successfully.`
       );
-      // Force full page reload to ensure server reads the new cookie
-      window.location.href = isAdmin ? "/admin" : "/";
+
+      // Navigate directly to the user's RESPECTIVE dashboard
+      const targetUrl = isAdmin ? "/admin" : isYouth ? "/youth" : "/dashboard";
+      window.location.href = targetUrl;
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg.includes("USER_NOT_FOUND")) {
@@ -130,10 +140,16 @@ function Page() {
           preferredLanguage: prefLang,
         },
       });
-      // Set cookie client-side to ensure session persists (server-side setCookie doesn't propagate on Cloudflare Workers)
-      if (res?.user?.id && typeof document !== "undefined") {
+
+      // Persist session to both localStorage and cookie
+      if (res?.user?.id && typeof window !== "undefined") {
+        try { window.localStorage.setItem("vvc_demo_uid", res.user.id); } catch {}
         document.cookie = `vvc_demo_uid=${res.user.id}; path=/; max-age=31536000; SameSite=Lax`;
       }
+      try {
+        if (res?.user?.id) await setDemoUserFn({ data: { userId: res.user.id } });
+      } catch {}
+
       await qc.invalidateQueries();
       const displayName = res?.user?.name || name.trim();
       toast.success(
@@ -141,8 +157,9 @@ function Page() {
           ? `నమోదు విజయవంతమైంది! స్వాగతం ${displayName}.`
           : `Registration successful! Welcome ${displayName}.`
       );
-      // Force full page reload to ensure server reads the new cookie
-      window.location.href = "/";
+
+      // Navigate new registered user to Member Dashboard
+      window.location.href = "/dashboard";
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg.includes("PHONE_ALREADY_EXISTS")) {
@@ -164,14 +181,16 @@ function Page() {
   const handleLogout = async () => {
     setBusy(true);
     try {
-      // Clear cookie client-side first
-      if (typeof document !== "undefined") {
+      // Clear session from both localStorage and cookie
+      if (typeof window !== "undefined") {
+        try { window.localStorage.removeItem("vvc_demo_uid"); } catch {}
         document.cookie = `vvc_demo_uid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
       }
-      await logoutUserFn();
+      try { await logoutUserFn(); } catch {}
+      try { await setDemoUserFn({ data: { userId: null } }); } catch {}
       await qc.invalidateQueries();
       toast.success(lang === "te" ? "లాగౌట్ అయ్యారు" : "Signed out successfully");
-      // Force full page reload to ensure cookie is cleared
+      // Force full page reload to ensure session is cleared
       window.location.href = "/";
     } finally {
       setBusy(false);
@@ -219,24 +238,42 @@ function Page() {
               {lang === "te" ? "లాగౌట్" : "Sign Out"}
             </Button>
           </div>
-          <div className="flex gap-2 pt-1 border-t">
-            <Button
-              size="sm"
-              className="w-full font-semibold"
-              onClick={() => nav({ to: "/" })}
-            >
-              {lang === "te" ? "హోమ్‌పేజీకి కొనసాగండి" : "Continue to Home"}
-            </Button>
+          <div className="flex flex-wrap gap-2 pt-2 border-t">
             {current.role === "ADMIN" && (
               <Button
-                variant="outline"
                 size="sm"
-                className="w-full font-semibold"
-                onClick={() => nav({ to: "/admin" })}
+                className="flex-1 font-semibold"
+                onClick={() => { window.location.href = "/admin"; }}
               >
                 {lang === "te" ? "అడ్మిన్ డాష్‌బోర్డ్" : "Admin Dashboard"}
               </Button>
             )}
+            {data.viewer.canSeeYouth && (
+              <Button
+                variant={current.role === "ADMIN" ? "outline" : "default"}
+                size="sm"
+                className="flex-1 font-semibold"
+                onClick={() => { window.location.href = "/youth"; }}
+              >
+                {lang === "te" ? "యువత డాష్‌బోర్డ్" : "Youth Dashboard"}
+              </Button>
+            )}
+            <Button
+              variant={current.role === "ADMIN" || data.viewer.canSeeYouth ? "outline" : "default"}
+              size="sm"
+              className="flex-1 font-semibold"
+              onClick={() => { window.location.href = "/dashboard"; }}
+            >
+              {lang === "te" ? "నా డాష్‌బోర్డ్" : "My Dashboard"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full font-medium text-xs text-muted-foreground"
+              onClick={() => { window.location.href = "/"; }}
+            >
+              {lang === "te" ? "హోమ్‌పేజీకి కొనసాగండి" : "Continue to Home"}
+            </Button>
           </div>
         </div>
       )}
