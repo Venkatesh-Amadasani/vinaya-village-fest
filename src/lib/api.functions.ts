@@ -24,10 +24,32 @@ async function ctx(year?: number) {
   const { ensureDb } = await store();
   const db = await ensureDb();
   let uid: string | undefined = undefined;
+  // Try multiple approaches to read the cookie (Cloudflare Workers compatibility)
   try {
     const { getCookie } = await import("@tanstack/react-start/server");
     uid = getCookie(DEMO_COOKIE);
   } catch {}
+  // Fallback: parse cookies from the raw web request (works on Cloudflare Workers)
+  if (!uid) {
+    try {
+      const { getWebRequest } = await import("@tanstack/react-start/server");
+      const req = getWebRequest();
+      const cookieHeader = req?.headers?.get?.("cookie") || "";
+      const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${DEMO_COOKIE}=([^;]*)`));
+      if (match?.[1]) uid = decodeURIComponent(match[1]);
+    } catch {}
+  }
+  // Fallback 2: h3 event (Nitro runtime)
+  if (!uid) {
+    try {
+      const { getEvent, parseCookies } = await import("h3");
+      const event = getEvent();
+      if (event) {
+        const cookies = parseCookies(event);
+        uid = cookies[DEMO_COOKIE];
+      }
+    } catch {}
+  }
   const festival =
     ((year ? db.festivals.find((f) => f.year === year) : undefined) ?? 
     db.festivals.find((f) => f.isCurrent) ?? 
@@ -40,6 +62,48 @@ function requirePerm(v: Viewer, p: Permission) {
   if (!can(v, p)) throw new Error("PERMISSION_DENIED");
 }
 const yearInput = z.object({ year: z.number().int().optional() });
+
+// Debug endpoint to diagnose cookie reading on Cloudflare Workers
+export const debugSessionFn = createServerFn({ method: "GET" }).handler(async () => {
+  const results: Record<string, any> = { methods: {} };
+  // Method 1: TanStack getCookie
+  try {
+    const { getCookie } = await import("@tanstack/react-start/server");
+    const val = getCookie(DEMO_COOKIE);
+    results.methods.tanstackGetCookie = { success: true, value: val || null };
+  } catch (e: any) {
+    results.methods.tanstackGetCookie = { success: false, error: e?.message || String(e) };
+  }
+  // Method 2: getWebRequest
+  try {
+    const { getWebRequest } = await import("@tanstack/react-start/server");
+    const req = getWebRequest();
+    const cookieHeader = req?.headers?.get?.("cookie") || "";
+    const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${DEMO_COOKIE}=([^;]*)`));
+    results.methods.webRequest = { success: true, cookieHeader: cookieHeader.substring(0, 200), parsedUid: match?.[1] || null };
+  } catch (e: any) {
+    results.methods.webRequest = { success: false, error: e?.message || String(e) };
+  }
+  // Method 3: h3 event
+  try {
+    const h3 = await import("h3");
+    const event = (h3 as any).getEvent?.();
+    if (event) {
+      const cookies = h3.parseCookies(event);
+      results.methods.h3Event = { success: true, uid: cookies[DEMO_COOKIE] || null };
+    } else {
+      results.methods.h3Event = { success: false, error: "getEvent not available or returned null" };
+    }
+  } catch (e: any) {
+    results.methods.h3Event = { success: false, error: e?.message || String(e) };
+  }
+  // Also check store users
+  const { ensureDb } = await store();
+  const db = await ensureDb();
+  results.userCount = db.users?.length || 0;
+  results.userIds = (db.users || []).slice(0, 5).map(u => ({ id: u.id.substring(0, 8) + "...", name: u.name, role: u.role }));
+  return results;
+});
 
 export const getSessionFn = createServerFn({ method: "GET" }).handler(async () => {
   const { db, festival, viewer } = await ctx();
