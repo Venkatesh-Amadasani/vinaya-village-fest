@@ -58,6 +58,10 @@ function Page() {
           password,
         },
       });
+      // Set cookie client-side to ensure session persists (server-side setCookie doesn't propagate on Cloudflare Workers)
+      if (res?.user?.id && typeof document !== "undefined") {
+        document.cookie = `vvc_demo_uid=${res.user.id}; path=/; max-age=31536000; SameSite=Lax`;
+      }
       await qc.invalidateQueries();
       const displayName = res?.user?.name || identifier.trim();
       const isAdmin = res?.user?.role === "ADMIN";
@@ -124,6 +128,10 @@ function Page() {
           preferredLanguage: prefLang,
         },
       });
+      // Set cookie client-side to ensure session persists (server-side setCookie doesn't propagate on Cloudflare Workers)
+      if (res?.user?.id && typeof document !== "undefined") {
+        document.cookie = `vvc_demo_uid=${res.user.id}; path=/; max-age=31536000; SameSite=Lax`;
+      }
       await qc.invalidateQueries();
       const displayName = res?.user?.name || name.trim();
       toast.success(
@@ -153,6 +161,10 @@ function Page() {
   const handleLogout = async () => {
     setBusy(true);
     try {
+      // Clear cookie client-side first
+      if (typeof document !== "undefined") {
+        document.cookie = `vvc_demo_uid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+      }
       await logoutUserFn();
       await qc.invalidateQueries();
       toast.success(lang === "te" ? "లాగౌట్ అయ్యారు" : "Signed out successfully");
