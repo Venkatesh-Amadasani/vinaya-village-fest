@@ -34,7 +34,7 @@ const dict = {
   PLANNING: ["Planning", "ప్రణాళిక"], ACTIVE: ["Active", "జరుగుతోంది"], FINAL_REVIEW: ["Final review", "తుది సమీక్ష"],
   CLOSED: ["Closed", "ముగిసింది"], ARCHIVED: ["Archived", "భద్రపరచబడింది"],
   donors: ["donors", "దాతలు"], village: ["Village", "గ్రామం"], split: ["Split", "విభజన"], seeYear: ["Open year", "సంవత్సరం చూడండి"],
-  combinedFund: ["Combined (General + Youth)", "మొత్తం (సాధారణ + యువత)"], youthFund: ["Youth fund", "యువత నిధి"], auctionOutstanding: ["Auction outstanding", "వేలం బాకీ"], demoSignInNote: ["Demo sign-in only — real accounts and permanent storage are not connected yet.", "డెమో లాగిన్ మాత్రమే — నిజమైన ఖాతాలు మరియు శాశ్వత నిల్వ ఇంకా అనుసంధానించలేదు."],
+  combinedFund: ["Combined (General + Youth)", "మొత్తం (సాధారణ + యువత)"], auctionOutstanding: ["Auction outstanding", "వేలం బాకీ"], demoSignInNote: ["Demo sign-in only — real accounts and permanent storage are not connected yet.", "డెమో లాగిన్ మాత్రమే — నిజమైన ఖాతాలు మరియు శాశ్వత నిల్వ ఇంకా అనుసంధానించలేదు."],
   dashboard: ["Dashboard", "డాష్‌బోర్డ్"], details: ["Details", "వివరాలు"], edit: ["Edit", "సవరించు"], myDashboard: ["My dashboard", "నా డాష్‌బోర్డ్"], demoBadge: ["Demo data", "డెమో డేటా"], back: ["Back", "వెనుకకు"],
   readOnly: ["This festival is closed — records are read-only.", "ఈ ఉత్సవం ముగిసింది — రికార్డులు చదవడానికి మాత్రమే."],
   history: ["Change history", "మార్పుల చరిత్ర"], festival: ["Festival", "ఉత్సవం"], youthDashboard: ["Youth dashboard", "యువత డాష్‌బోర్డ్"],
